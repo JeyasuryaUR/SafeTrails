@@ -1,0 +1,53 @@
+### Test SafeTrails API
+
+### Health Check
+GET http://localhost:3000/health
+
+### API Info
+GET http://localhost:3000/
+
+### Register User
+POST http://localhost:3000/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "testpassword123",
+  "firstName": "Test",
+  "lastName": "User",
+  "phone": "+1234567890"
+}
+
+### Login User
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "testpassword123"
+}
+
+### Get Profile (replace TOKEN with actual JWT token)
+GET http://localhost:3000/api/auth/profile
+Authorization: Bearer TOKEN
+
+### Update Profile (replace TOKEN with actual JWT token)
+PUT http://localhost:3000/api/auth/profile
+Content-Type: application/json
+Authorization: Bearer TOKEN
+
+{
+  "firstName": "Updated",
+  "lastName": "Name",
+  "phone": "+0987654321"
+}
+
+### Change Password (replace TOKEN with actual JWT token)
+PUT http://localhost:3000/api/auth/change-password
+Content-Type: application/json
+Authorization: Bearer TOKEN
+
+{
+  "currentPassword": "testpassword123",
+  "newPassword": "newpassword123"
+}
