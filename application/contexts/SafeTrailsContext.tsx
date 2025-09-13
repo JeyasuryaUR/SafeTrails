@@ -230,134 +230,10 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
   ]);
 
   useEffect(() => {
-<<<<<<< Updated upstream
-    loadOnboardingStatus();
-    
-    // Simulate real-time location updates every 10 minutes
-    const locationInterval = setInterval(() => {
-      simulateLocationUpdate();
-    }, 10 * 60 * 1000); // 10 minutes
-
-    // Simulate safety score updates every 30 seconds for demo
-    const safetyInterval = setInterval(() => {
-      updateSafetyScore();
-    }, 30 * 1000);
-
-    // Simulate new community reports every 2 minutes
-    const reportsInterval = setInterval(() => {
-      addNewCommunityReport();
-    }, 2 * 60 * 1000);
-
-    return () => {
-      clearInterval(locationInterval);
-      clearInterval(safetyInterval);
-      clearInterval(reportsInterval);
-    };
-  }, []);
-
-  const simulateLocationUpdate = () => {
-    const locations = [
-      { lat: 28.6139, lng: 77.2090, location: 'India Gate, New Delhi' },
-      { lat: 28.6562, lng: 77.2410, location: 'Connaught Place, New Delhi' },
-      { lat: 28.6279, lng: 77.2185, location: 'Lotus Temple, New Delhi' },
-      { lat: 28.6507, lng: 77.2334, location: 'Red Fort, New Delhi' },
-      { lat: 28.6596, lng: 77.2350, location: 'Chandni Chowk, New Delhi' },
-    ];
-    
-    const randomLocation = locations[Math.floor(Math.random() * locations.length)];
-    setCurrentLocation({ lat: randomLocation.lat, lng: randomLocation.lng });
-    setLastLocationUpdate(new Date().toISOString());
-    
-    // Update location history
-    setTouristProfile(prev => ({
-      ...prev,
-      lastActiveTime: new Date().toISOString(),
-      locationHistory: [
-        {
-          timestamp: new Date().toISOString(),
-          lat: randomLocation.lat,
-          lng: randomLocation.lng,
-          location: randomLocation.location
-        },
-        ...prev.locationHistory.slice(0, 4) // Keep last 5 locations
-      ]
-    }));
-  };
-
-  const updateSafetyScore = () => {
-    setSafetyScore(prev => {
-      const variance = 5; // ±5 points variation
-      const newOverall = Math.max(60, Math.min(95, prev.overall + (Math.random() - 0.5) * variance));
-      const newRouteRisk = Math.max(70, Math.min(100, prev.routeRisk + (Math.random() - 0.5) * variance));
-      const newActivityness = Math.max(60, Math.min(90, prev.activeness + (Math.random() - 0.5) * variance));
-      
-      let badge: SafetyScore['badge'] = 'Safe Explorer';
-      if (newOverall >= 90) badge = 'Safety Champion';
-      else if (newOverall >= 80) badge = 'Adventure Seeker';
-      else if (newOverall >= 70) badge = 'Safe Explorer';
-      else if (newOverall >= 60) badge = 'Cautious Traveler';
-      else badge = 'At Risk';
-
-      return {
-        ...prev,
-        overall: Math.round(newOverall),
-        routeRisk: Math.round(newRouteRisk),
-        activeness: Math.round(newActivityness),
-        badge
-      };
-    });
-  };
-
-  const addNewCommunityReport = () => {
-    const newReports = [
-      {
-        title: 'Free water distribution',
-        location: 'Metro Station Exit',
-        category: 'Safety' as const,
-        description: 'NGO providing free water to tourists. Very helpful in this heat!',
-        reportedBy: 'HelpfulTourist'
-      },
-      {
-        title: 'Street food vendor verified',
-        location: 'Parathe Wali Gali',
-        category: 'Safety' as const,
-        description: 'This vendor has clean setup and good hygiene. Recommended!',
-        reportedBy: 'FoodieExplorer'
-      },
-      {
-        title: 'Construction work ahead',
-        location: 'Rajpath',
-        category: 'Roadblock' as const,
-        description: 'Republic Day preparations. Expect delays and road closures.',
-        reportedBy: 'LocalGuide'
-      },
-      {
-        title: 'Tourist assistance center',
-        location: 'Red Fort Gate',
-        category: 'Safety' as const,
-        description: 'Government setup tourist help desk with multilingual support.',
-        reportedBy: 'OfficialUpdate'
-      }
-    ];
-
-    const randomReport = newReports[Math.floor(Math.random() * newReports.length)];
-    const newReport: CommunityReport = {
-      id: Date.now().toString(),
-      ...randomReport,
-      timestamp: 'Just now',
-      upvotes: Math.floor(Math.random() * 20) + 1
-    };
-
-    setCommunityReports(prev => [newReport, ...prev.slice(0, 7)]); // Keep latest 8 reports
-  };
-
-  const loadOnboardingStatus = async () => {
-=======
     loadAppState();
   }, []);
 
   const loadAppState = async () => {
->>>>>>> Stashed changes
     try {
       const [onboardingStatus, kycStatus, authStatus, userData] = await Promise.all([
         AsyncStorage.getItem('hasCompletedOnboarding'),
@@ -490,24 +366,9 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     updateLocation,
     language,
     toggleLanguage,
-<<<<<<< Updated upstream
-    lastLocationUpdate,
-    alertCount,
-    realTimeUpdates,
-    simulateLocationUpdate,
-    updateSafetyScore,
-    addNewCommunityReport,
-    setTouristProfile,
-    setSafetyScore,
-    setItinerary,
-    setCommunityReports,
-    setAlertCount,
-    setRealTimeUpdates
-=======
     isAuthenticated,
     user,
     login,
     logout
->>>>>>> Stashed changes
   };
 });
