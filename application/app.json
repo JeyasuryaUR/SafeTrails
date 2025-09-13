@@ -33,21 +33,13 @@
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-dev-client",
-      [
-        "expo-router",
-        {
-          "origin": "https://rork.com/"
-        }
-      ]
-    ],
+    "plugins": [],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "router": {
-        "origin": "https://rork.com/"
+        "origin": false
       },
       "eas": {
         "projectId": "78fa0fc0-3a47-497e-a18a-18a20af3263e"

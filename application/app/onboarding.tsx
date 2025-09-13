@@ -60,7 +60,7 @@ export default function OnboardingScreen() {
 
   const handleGetStarted = async () => {
     await completeOnboarding();
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/dashboard');
   };
 
   const slide = slides[currentSlide];

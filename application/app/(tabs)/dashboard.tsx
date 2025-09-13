@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Animated,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
@@ -15,7 +17,11 @@ import {
   TrendingUp,
   CheckCircle,
   Clock,
-  Globe
+  Globe,
+  Activity,
+  Users,
+  Zap,
+  Navigation
 } from 'lucide-react-native';
 import { useSafeTrails } from '@/contexts/SafeTrailsContext';
 import { router } from 'expo-router';
@@ -23,7 +29,50 @@ import { router } from 'expo-router';
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
-  const { safetyScore, touristProfile, language, toggleLanguage, isInDangerZone } = useSafeTrails();
+  const { 
+    safetyScore, 
+    touristProfile, 
+    language, 
+    toggleLanguage, 
+    isInDangerZone,
+    lastLocationUpdate,
+    communityReports,
+    updateSafetyScore,
+    simulateLocationUpdate 
+  } = useSafeTrails();
+
+  const [animatedScore] = useState(new Animated.Value(safetyScore.overall));
+  const [isLive, setIsLive] = useState(true);
+
+  useEffect(() => {
+    // Animate score changes
+    Animated.timing(animatedScore, {
+      toValue: safetyScore.overall,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+  }, [safetyScore.overall]);
+
+  const handleEmergencyAlert = () => {
+    Alert.alert(
+      '🚨 Emergency Alert Sent!',
+      'Your location and emergency status has been shared with:\n• Emergency Services (112)\n• Tourist Helpline (1363)\n• Fellow tourists nearby\n• Emergency contacts',
+      [{ text: 'OK', style: 'default' }]
+    );
+  };
+
+  const getTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const past = new Date(timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - past.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    const hours = Math.floor(diffInMinutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
 
   const renderSafetyGauge = () => {
     const percentage = safetyScore.overall;
