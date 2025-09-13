@@ -345,19 +345,20 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
 });
 
 // Update SOS status (user can mark as resolved)
-router.put('/:id/status', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.put('/:id/status', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    console.log(id)
     const { status, description } = req.body;
 
-    if (!['RESOLVED', 'FALSE_ALARM'].includes(status)) {
+    if (!['ACKNOWLEDGED', 'FALSE_ALARM'].includes(status)) {
       return res.status(400).json({ message: 'Status can only be updated to RESOLVED or FALSE_ALARM by user' });
     }
 
     const existingSos = await prisma.sosRequest.findFirst({
       where: {
         id,
-        userId: req.user!.id
+        // userId: req.id
       }
     });
 
@@ -370,22 +371,22 @@ router.put('/:id/status', authenticateToken, async (req: AuthRequest, res: Respo
       data: {
         status,
         description: description || existingSos.description,
-        resolvedAt: status === 'RESOLVED' ? new Date() : null
+        resolvedAt: new Date()
       }
     });
 
     // If resolving SOS, update trip status back to ACTIVE if it was in EMERGENCY
-    if (status === 'RESOLVED' && existingSos.tripId) {
-      await prisma.trip.updateMany({
-        where: {
-          id: existingSos.tripId,
-          status: 'EMERGENCY'
-        },
-        data: {
-          status: 'ACTIVE'
-        }
-      });
-    }
+    // if (status === 'RESOLVED' && existingSos.tripId) {
+    //   await prisma.trip.updateMany({
+    //     where: {
+    //       id: existingSos.tripId,
+    //       status: 'EMERGENCY'
+    //     },
+    //     data: {
+    //       status: 'ACTIVE'
+    //     }
+    //   });
+    // }
 
     res.json({
       message: `SOS request marked as ${status.toLowerCase()}`,
