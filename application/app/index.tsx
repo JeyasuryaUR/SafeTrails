@@ -4,17 +4,21 @@ import { useSafeTrails } from '@/contexts/SafeTrailsContext';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 export default function IndexScreen() {
-  const { hasCompletedOnboarding, isLoading } = useSafeTrails();
+  const { hasCompletedOnboarding, hasCompletedKYC, isAuthenticated, isLoading } = useSafeTrails();
 
   useEffect(() => {
     if (!isLoading) {
-      if (hasCompletedOnboarding) {
+      if (!isAuthenticated) {
+        router.replace('/auth');
+      } else if (!hasCompletedKYC) {
+        router.replace('/kyc');
+      } else if (hasCompletedOnboarding) {
         router.replace('/(tabs)/dashboard');
       } else {
         router.replace('/onboarding');
       }
     }
-  }, [hasCompletedOnboarding, isLoading]);
+  }, [hasCompletedOnboarding, hasCompletedKYC, isAuthenticated, isLoading]);
 
   return (
     <View style={styles.container}>

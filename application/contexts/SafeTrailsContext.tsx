@@ -52,8 +52,27 @@ export interface ItineraryItem {
   riskLevel: 'low' | 'medium' | 'high';
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  aadharNumber?: string;
+  dateOfBirth?: string;
+}
+
+export interface KYCData {
+  aadharNumber: string;
+  dateOfBirth: string;
+}
+
 export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(false);
+  const [hasCompletedKYC, setHasCompletedKYC] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isInDangerZone, setIsInDangerZone] = useState<boolean>(false);
@@ -211,6 +230,7 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
   ]);
 
   useEffect(() => {
+<<<<<<< Updated upstream
     loadOnboardingStatus();
     
     // Simulate real-time location updates every 10 minutes
@@ -332,11 +352,29 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
   };
 
   const loadOnboardingStatus = async () => {
+=======
+    loadAppState();
+  }, []);
+
+  const loadAppState = async () => {
+>>>>>>> Stashed changes
     try {
-      const status = await AsyncStorage.getItem('hasCompletedOnboarding');
-      setHasCompletedOnboarding(status === 'true');
+      const [onboardingStatus, kycStatus, authStatus, userData] = await Promise.all([
+        AsyncStorage.getItem('hasCompletedOnboarding'),
+        AsyncStorage.getItem('hasCompletedKYC'),
+        AsyncStorage.getItem('isAuthenticated'),
+        AsyncStorage.getItem('user')
+      ]);
+
+      setHasCompletedOnboarding(onboardingStatus === 'true');
+      setHasCompletedKYC(kycStatus === 'true');
+      setIsAuthenticated(authStatus === 'true');
+
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
     } catch (error) {
-      console.log('Error loading onboarding status:', error);
+      console.log('Error loading app state:', error);
     } finally {
       setIsLoading(false);
     }
@@ -348,6 +386,27 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
       setHasCompletedOnboarding(true);
     } catch (error) {
       console.log('Error saving onboarding status:', error);
+    }
+  };
+
+  const completeKYC = async (kycData: KYCData) => {
+    try {
+      const updatedUser = {
+        ...user!,
+        aadharNumber: kycData.aadharNumber,
+        dateOfBirth: kycData.dateOfBirth
+      };
+
+      await Promise.all([
+        AsyncStorage.setItem('hasCompletedKYC', 'true'),
+        AsyncStorage.setItem('user', JSON.stringify(updatedUser))
+      ]);
+
+      setHasCompletedKYC(true);
+      setUser(updatedUser);
+    } catch (error) {
+      console.log('Error saving KYC status:', error);
+      throw error;
     }
   };
 
@@ -373,10 +432,55 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     setLanguage(prev => prev === 'en' ? 'hi' : 'en');
   };
 
+  const login = async (email: string, password: string) => {
+    // Simulate API call
+    const newUser = {
+      id: 'U123',
+      name: 'John Doe',
+      email,
+      phone: '+1-555-0100',
+      emergencyContact: 'Jane Doe',
+      emergencyPhone: '+1-555-0101'
+    };
+
+    try {
+      await Promise.all([
+        AsyncStorage.setItem('isAuthenticated', 'true'),
+        AsyncStorage.setItem('user', JSON.stringify(newUser))
+      ]);
+
+      setUser(newUser);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.log('Error saving auth state:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem('isAuthenticated'),
+        AsyncStorage.removeItem('user'),
+        AsyncStorage.removeItem('hasCompletedOnboarding'),
+        AsyncStorage.removeItem('hasCompletedKYC')
+      ]);
+
+      setUser(null);
+      setIsAuthenticated(false);
+      setHasCompletedOnboarding(false);
+      setHasCompletedKYC(false);
+    } catch (error) {
+      console.log('Error clearing auth state:', error);
+    }
+  };
+
   return {
     hasCompletedOnboarding,
+    hasCompletedKYC,
     isLoading,
     completeOnboarding,
+    completeKYC,
     touristProfile,
     safetyScore,
     itinerary,
@@ -386,6 +490,7 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     updateLocation,
     language,
     toggleLanguage,
+<<<<<<< Updated upstream
     lastLocationUpdate,
     alertCount,
     realTimeUpdates,
@@ -398,5 +503,11 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     setCommunityReports,
     setAlertCount,
     setRealTimeUpdates
+=======
+    isAuthenticated,
+    user,
+    login,
+    logout
+>>>>>>> Stashed changes
   };
 });
