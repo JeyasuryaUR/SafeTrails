@@ -8,18 +8,40 @@
     "dev": "nodemon src/app.ts",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:setup": "./scripts/setup-db.sh",
+    "db:migrate": "npx prisma migrate dev",
+    "db:generate": "npx prisma generate",
+    "db:studio": "npx prisma studio",
+    "db:reset": "npx prisma migrate reset",
+    "db:seed": "npx ts-node prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "express": "^5.1.0"
+    "@prisma/client": "^6.16.1",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
+    "prisma": "^6.16.1",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^24.3.1",
+    "@types/multer": "^1.4.12",
+    "@types/node-cron": "^3.0.11",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"

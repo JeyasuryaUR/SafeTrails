@@ -1,0 +1,284 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  firstName    String?
+  lastName     String?
+  username     String?  @unique
+  phone        String?
+  profileImage String?
+  
+  // KYC Details
+  dateOfBirth   DateTime?
+  aadhaarNumber String?   @unique
+  digitalId     String?   @unique  // Blockchain generated unique ID
+  kycStatus     KycStatus @default(PENDING)
+  kycDocuments  Json?     // Store document URLs and types
+  safetyScore   Float?    @default(0.0)
+  
+  // Current Location Tracking
+  currentLatitude  Float?
+  currentLongitude Float?
+  lastLocationUpdate DateTime?
+  
+  // Emergency Contacts
+  emergencyContacts Json?  // Array of emergency contact objects
+  
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  trips         Trip[]
+  communityPosts CommunityPost[]
+  sosRequests   SosRequest[]
+  locationUpdates LocationUpdate[]
+  kycApplication KycApplication?
+
+  @@map("users")
+}
+
+model KycApplication {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  aadhaarNumber   String    @unique
+  fullName        String
+  dateOfBirth     DateTime
+  address         String
+  phoneNumber     String
+  email           String
+  documentType    String    // "AADHAAR", "PASSPORT", "DRIVING_LICENSE"
+  documentNumber  String
+  documentImage   String    // URL to uploaded document
+  selfieImage     String    // URL to uploaded selfie
+  status          KycStatus @default(PENDING)
+  adminComments   String?
+  verifiedAt      DateTime?
+  verifiedBy      String?   // Admin user ID who verified
+  blockchainTxHash String?  // Transaction hash for digital ID generation
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationships
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_applications")
+}
+
+model Trip {
+  id              String      @id @default(cuid())
+  userId          String
+  title           String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime
+  startLocation   String
+  endLocation     String
+  startLatitude   Float
+  startLongitude  Float
+  endLatitude     Float
+  endLongitude    Float
+  status          TripStatus  @default(PLANNED)
+  safetyScore     Float?      @default(0.0)
+  totalDistance   Float?      // in kilometers
+  estimatedDuration Int?      // in minutes
+  actualStartTime DateTime?
+  actualEndTime   DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relationships
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itineraryItems  ItineraryItem[]
+  communityPosts  CommunityPost[]
+  sosRequests     SosRequest[]
+  locationUpdates LocationUpdate[]
+
+  @@map("trips")
+}
+
+model ItineraryItem {
+  id          String   @id @default(cuid())
+  tripId      String
+  location    String
+  landmark    String?
+  latitude    Float
+  longitude   Float
+  plannedTime DateTime?
+  safetyScore Float?   @default(0.0)
+  order       Int      // Order of the item in the itinerary
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("itinerary_items")
+}
+
+model LocationUpdate {
+  id          String   @id @default(cuid())
+  userId      String
+  tripId      String?
+  latitude    Float
+  longitude   Float
+  accuracy    Float?   // GPS accuracy in meters
+  speed       Float?   // Speed in km/h
+  heading     Float?   // Direction in degrees
+  altitude    Float?   // Altitude in meters
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip        Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@map("location_updates")
+}
+
+model CommunityPost {
+  id              String          @id @default(cuid())
+  userId          String
+  tripId          String?         // Optional trip association
+  title           String
+  imageUrl        String?
+  issueDescription String
+  location        String
+  latitude        Float?
+  longitude       Float?
+  incidentType    IncidentType    @default(OTHER)
+  priority        Priority        @default(MEDIUM)
+  status          IncidentStatus  @default(OPEN)
+  likeCount       Int             @default(0)
+  dislikeCount    Int             @default(0)
+  adminComments   String?
+  resolvedAt      DateTime?
+  resolvedBy      String?         // Admin user ID who resolved
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relationships
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip            Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@map("community_posts")
+}
+
+model SosRequest {
+  id              String      @id @default(cuid())
+  userId          String
+  tripId          String?
+  location        String
+  latitude        Float
+  longitude       Float
+  sosType         SosType     @default(GENERAL)
+  status          SosStatus   @default(NEW)
+  description     String?
+  contactNumbers  Json?       // Emergency contacts called
+  responseTime    DateTime?   // When help arrived/responded
+  resolvedAt      DateTime?
+  adminComments   String?
+  resolvedBy      String?     // Admin user ID who resolved
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relationships
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip            Trip?       @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@map("sos_requests")
+}
+
+model Admin {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        AdminRole  @default(MODERATOR)
+  permissions Json?      // Array of permissions
+  isActive    Boolean    @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("admins")
+}
+
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum TripStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EMERGENCY
+}
+
+enum IncidentType {
+  ROAD_ACCIDENT
+  THEFT
+  HARASSMENT
+  MEDICAL_EMERGENCY
+  NATURAL_DISASTER
+  FRAUD
+  INFRASTRUCTURE
+  OTHER
+}
+
+enum IncidentStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SosType {
+  GENERAL
+  MEDICAL
+  SECURITY
+  ACCIDENT
+  NATURAL_DISASTER
+}
+
+enum SosStatus {
+  NEW
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  VIEWER
+}
