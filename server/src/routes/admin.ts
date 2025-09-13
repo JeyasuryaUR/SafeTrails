@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { authenticateAdminToken, AdminAuthRequest } from '../middleware/adminAuth';
+import { blockchainService } from '../services/blockchain';
 
 const router = Router();
 
@@ -626,6 +627,165 @@ router.get('/analytics/locations', authenticateAdminToken, async (req: AdminAuth
   } catch (error) {
     console.error('Analytics error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Blockchain Management Endpoints
+
+// Get blockchain service status
+router.get('/blockchain/status', authenticateAdminToken, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const walletAddress = blockchainService.getWalletAddress();
+    const balance = await blockchainService.getWalletBalance();
+    const totalIds = await blockchainService.getTotalDigitalIDs();
+
+    res.json({
+      status: 'Connected',
+      walletAddress,
+      balance: `${balance} ETH`,
+      totalDigitalIds: totalIds,
+      contractAddress: process.env.CONTRACT_ADDRESS,
+      rpcUrl: process.env.BLOCKCHAIN_RPC_URL
+    });
+  } catch (error) {
+    console.error('Blockchain status error:', error);
+    res.status(500).json({ 
+      status: 'Error',
+      message: 'Failed to connect to blockchain',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get wallet balance
+router.get('/blockchain/balance', authenticateAdminToken, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const balance = await blockchainService.getWalletBalance();
+    const walletAddress = blockchainService.getWalletAddress();
+
+    res.json({
+      walletAddress,
+      balance: `${balance} ETH`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Balance check error:', error);
+    res.status(500).json({ message: 'Failed to get wallet balance' });
+  }
+});
+
+// Get total digital IDs on blockchain
+router.get('/blockchain/total-ids', authenticateAdminToken, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const totalIds = await blockchainService.getTotalDigitalIDs();
+
+    res.json({
+      totalDigitalIds: totalIds,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Total IDs check error:', error);
+    res.status(500).json({ message: 'Failed to get total digital IDs' });
+  }
+});
+
+// Generate digital ID for user (admin override)
+router.post('/blockchain/generate-digital-id', authenticateAdminToken, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const { userId, aadhaarNumber, dateOfBirth } = req.body;
+
+    if (!userId || !aadhaarNumber || !dateOfBirth) {
+      return res.status(400).json({ message: 'User ID, Aadhaar number, and date of birth are required' });
+    }
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Convert date of birth to timestamp
+    const dobTimestamp = Math.floor(new Date(dateOfBirth).getTime() / 1000);
+
+    // Generate digital ID
+    const digitalIDResult = await blockchainService.generateDigitalID(aadhaarNumber, dobTimestamp);
+
+    // Update user with digital ID
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        digitalId: digitalIDResult.publicKey,
+        safetyScore: 75.0
+      }
+    });
+
+    res.json({
+      message: 'Digital ID generated successfully',
+      digitalId: {
+        digitalIdNumber: digitalIDResult.digitalIdNumber,
+        publicKey: digitalIDResult.publicKey,
+        status: digitalIDResult.status,
+        issuedTime: digitalIDResult.issuedTime
+      },
+      user: {
+        id: updatedUser.id,
+        digitalId: updatedUser.digitalId,
+        safetyScore: updatedUser.safetyScore
+      }
+    });
+  } catch (error) {
+    console.error('Digital ID generation error:', error);
+    res.status(500).json({ 
+      message: 'Failed to generate digital ID',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Verify digital ID
+router.get('/blockchain/verify/:digitalIdNumber', authenticateAdminToken, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const { digitalIdNumber } = req.params;
+
+    const isValid = await blockchainService.verifyDigitalID(digitalIdNumber);
+    const digitalID = await blockchainService.getDigitalID(digitalIdNumber);
+
+    res.json({
+      digitalIdNumber,
+      isValid,
+      digitalId: digitalID,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Digital ID verification error:', error);
+    res.status(500).json({ 
+      message: 'Failed to verify digital ID',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get digital ID by user address
+router.get('/blockchain/user/:address', authenticateAdminToken, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const { address } = req.params;
+
+    const digitalID = await blockchainService.getDigitalIDByUser(address);
+
+    res.json({
+      userAddress: address,
+      digitalId: digitalID,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Get digital ID by user error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get digital ID by user',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 

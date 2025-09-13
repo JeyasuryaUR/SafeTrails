@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { blockchainService } from '../services/blockchain';
 
 const router = Router();
 
@@ -257,36 +258,62 @@ router.post('/kyc/submit', authenticateToken, async (req: AuthRequest, res: Resp
       return res.status(400).json({ message: 'Aadhaar number already registered' });
     }
 
-    // Create KYC application
-    const kycApplication = await prisma.kycApplication.create({
+    // Generate digital ID from blockchain
+    let digitalId = null;
+    let digitalIdNumber = null;
+    
+    try {
+      console.log('Generating digital ID from blockchain...');
+      
+      // Convert date of birth to timestamp
+      const dobTimestamp = Math.floor(new Date(dateOfBirth).getTime() / 1000);
+      
+      // Generate digital ID using blockchain service
+      const digitalIDResult = await blockchainService.generateDigitalID(aadhaarNumber, dobTimestamp);
+      
+      digitalId = digitalIDResult.publicKey;
+      digitalIdNumber = digitalIDResult.digitalIdNumber;
+      
+      console.log('Digital ID generated successfully:', {
+        digitalIdNumber,
+        publicKey: digitalId,
+        status: digitalIDResult.status
+      });
+    } catch (blockchainError) {
+      console.error('Blockchain digital ID generation failed:', blockchainError);
+      // Continue with KYC submission even if blockchain fails
+      // The digital ID can be generated later by admin
+    }
+
+    // Update user with KYC details and digital ID
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user!.id },
       data: {
-        userId: req.user!.id,
         aadhaarNumber,
-        fullName,
         dateOfBirth: new Date(dateOfBirth),
-        address,
-        phoneNumber,
-        email,
-        documentType: documentType || 'AADHAAR',
-        documentNumber,
-        documentImage,
-        selfieImage,
-        status: 'SUBMITTED'
+        firstName: fullName?.split(' ')[0],
+        lastName: fullName?.split(' ').slice(1).join(' '),
+        phone: phoneNumber,
+        email: email,
+        digitalId: digitalId,
+        safetyScore: digitalId ? 75.0 : 0.0 // Set initial safety score if digital ID is generated
       }
     });
 
-    // Update user KYC status
-    await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { kycStatus: 'SUBMITTED' }
-    });
-
     res.status(201).json({
-      message: 'KYC application submitted successfully',
-      application: {
-        id: kycApplication.id,
-        status: kycApplication.status,
-        createdAt: kycApplication.createdAt
+      message: 'KYC details submitted successfully',
+      user: {
+        id: updatedUser.id,
+        aadhaarNumber: updatedUser.aadhaarNumber,
+        dateOfBirth: updatedUser.dateOfBirth,
+        digitalId: updatedUser.digitalId,
+        safetyScore: updatedUser.safetyScore,
+        updatedAt: updatedUser.updatedAt
+      },
+      blockchain: {
+        digitalIdGenerated: !!digitalId,
+        digitalIdNumber: digitalIdNumber,
+        publicKey: digitalId
       }
     });
   } catch (error) {
@@ -311,7 +338,7 @@ router.get('/kyc/status', authenticateToken, async (req: AuthRequest, res: Respo
     });
 
     if (!kycApplication) {
-      return res.status(404).json({ message: 'No KYC application found' });
+      return res.status(201).json({ message: 'No KYC application found',status:false });
     }
 
     res.json({ kycApplication });
