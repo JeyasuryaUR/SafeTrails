@@ -285,6 +285,30 @@ router.post('/kyc/submit', authenticateToken, async (req: AuthRequest, res: Resp
       // The digital ID can be generated later by admin
     }
 
+    // Create KYC application
+    await prisma.kycApplication.create({
+      data: {
+        userId: req.user!.id,
+        aadhaarNumber,
+        fullName,
+        dateOfBirth: new Date(dateOfBirth),
+        address,
+        phoneNumber,
+        email,
+        documentType: documentType || 'AADHAAR',
+        documentNumber,
+        documentImage,
+        selfieImage,
+        status: 'APPROVED'
+      }
+    });
+
+    // Update user KYC status
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { kycStatus: 'APPROVED' }
+    });
+
     // Update user with KYC details and digital ID
     const updatedUser = await prisma.user.update({
       where: { id: req.user!.id },
@@ -296,7 +320,7 @@ router.post('/kyc/submit', authenticateToken, async (req: AuthRequest, res: Resp
         phone: phoneNumber,
         email: email,
         digitalId: digitalId,
-        safetyScore: digitalId ? 75.0 : 0.0 // Set initial safety score if digital ID is generated
+        safetyScore: digitalId ? 75.0 : 0.0, // Set initial safety score if digital ID is generated
       }
     });
 
