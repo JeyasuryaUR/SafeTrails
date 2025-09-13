@@ -11,15 +11,87 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  firstName String?
-  lastName  String?
-  phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  firstName    String?
+  lastName     String?
+  username     String?  @unique
+  phone        String?
+  
+  // KYC Details
+  dateOfBirth  DateTime?
+  aadhaarNumber String?  @unique
+  digitalId    String?  @unique
+  safetyScore  Float?   @default(0.0)
+  
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  trips        Trip[]
+  communityPosts CommunityPost[]
 
   @@map("users")
+}
+
+model Trip {
+  id          String   @id @default(cuid())
+  userId      String
+  startDate   DateTime
+  endDate     DateTime
+  location    String
+  score       Float?   @default(0.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itineraryItems ItineraryItem[]
+
+  @@map("trips")
+}
+
+model ItineraryItem {
+  id          String   @id @default(cuid())
+  tripId      String
+  location    String
+  landmark    String?
+  latitude    Float
+  longitude   Float
+  safetyScore Float?   @default(0.0)
+  order       Int      // Order of the item in the itinerary
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("itinerary_items")
+}
+
+model CommunityPost {
+  id              String   @id @default(cuid())
+  userId          String
+  imageUrl        String?
+  issueDescription String
+  location        String
+  likeCount       Int      @default(0)
+  dislikeCount    Int      @default(0)
+  priority        Priority @default(MEDIUM)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("community_posts")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
