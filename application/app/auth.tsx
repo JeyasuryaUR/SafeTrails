@@ -2,129 +2,159 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  StatusBar,
   ScrollView,
-  Alert,
+  TouchableOpacity,
+  TextInput,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useSafeTrails } from '@/contexts/SafeTrailsContext';
-import { CustomInputField } from '@/components/CustomInputField';
-
-interface FormData {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  phone: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-}
+import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react-native';
+import Toast from 'react-native-toast-message';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { login, completeOnboarding } = useSafeTrails();
+  const [loading, setLoading] = useState(false);
+  
+  // Login form
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  
+  // Register form
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
 
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '',
-    emergencyContact: '',
-    emergencyPhone: ''
-  });
+  const { login, register } = useSafeTrails();
 
-  const updateFormData = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
-  const validateForm = () => {
-    if (!formData.email || !formData.password) {
-      Alert.alert('Error', 'Email and password are required');
-      return false;
-    }
-
-    if (!isLogin) {
-      if (!formData.name) {
-        Alert.alert('Error', 'Name is required');
-        return false;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        Alert.alert('Error', 'Passwords do not match');
-        return false;
-      }
-      if (formData.password.length < 6) {
-        Alert.alert('Error', 'Password must be at least 6 characters');
-        return false;
-      }
-      if (!formData.phone) {
-        Alert.alert('Error', 'Phone number is required');
-        return false;
-      }
-      if (!formData.emergencyContact || !formData.emergencyPhone) {
-        Alert.alert('Error', 'Emergency contact details are required');
-        return false;
-      }
-    }
-
-    return true;
+  const validatePhone = (phone: string) => {
+    const phoneRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
+    return phoneRegex.test(phone);
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill in all fields',
+      });
+      return;
+    }
 
+    if (!validateEmail(loginEmail)) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Email',
+        text2: 'Please enter a valid email address',
+      });
+      return;
+    }
 
-    setIsLoading(true);
-    
+    if (loginPassword.length < 6) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Password',
+        text2: 'Password must be at least 6 characters',
+      });
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await login(loginEmail, loginPassword);
       
-      if (isLogin) {
-        // Handle login
-        await login(formData.email, formData.password);
-        // Alert.alert(
-        //   'Success',
-        //   'Login successful!',
-        //   [
-        //     {
-        //       text: 'OK',
-        //       onPress: () => {
-                router.replace('/kyc');
-        //       }
-        //     }
-        //   ]
-        // );
-      } else {
-        // Handle signup - first login the user, then complete onboarding
-        await login(formData.email, formData.password);
-        await completeOnboarding();
-        // Alert.alert(
-        //   'Success',
-        //   'Account created successfully!',
-        //   [
-        //     {
-        //       text: 'OK',
-        //       onPress: () => {
-                router.replace('/kyc');
-        //       }
-        //     }
-        //   ]
-        // );
-      }
-    } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome Back!',
+        text2: 'Login successful',
+      });
+      
+      // Navigation is handled in the context after successful login
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Login Failed',
+        text2: error.message || 'Invalid credentials',
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!registerEmail || !registerPassword || !firstName || !lastName || !phone) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Fields',
+        text2: 'Please fill in all fields',
+      });
+      return;
+    }
+
+    if (!validateEmail(registerEmail)) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Email',
+        text2: 'Please enter a valid email address',
+      });
+      return;
+    }
+
+    if (registerPassword.length < 6) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Password',
+        text2: 'Password must be at least 6 characters',
+      });
+      return;
+    }
+
+    if (!validatePhone(phone)) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Phone',
+        text2: 'Please enter a valid phone number',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await register({
+        email: registerEmail,
+        password: registerPassword,
+        firstName,
+        lastName,
+        phone,
+      });
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome to SafeTrails!',
+        text2: 'Account created successfully',
+      });
+      
+      // Navigation is handled in the context after successful registration
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Registration Failed',
+        text2: error.message || 'Failed to create account',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -133,28 +163,21 @@ export default function AuthScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
       <LinearGradient
         colors={['#1E40AF', '#2563EB', '#3B82F6']}
-        style={styles.container}
+        style={styles.gradient}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <MaterialIcons name="security" size={60} color="#FFFFFF" />
-            </View>
             <Text style={styles.title}>SafeTrails</Text>
             <Text style={styles.subtitle}>
-              {isLogin ? 'Welcome back!' : 'Create your account'}
+              {isLogin ? 'Welcome Back!' : 'Join SafeTrails'}
             </Text>
           </View>
 
-          {/* Form Container */}
           <View style={styles.formContainer}>
             <View style={styles.toggleContainer}>
               <TouchableOpacity
@@ -170,129 +193,152 @@ export default function AuthScreen() {
                 onPress={() => setIsLogin(false)}
               >
                 <Text style={[styles.toggleText, !isLogin && styles.activeToggleText]}>
-                  Sign Up
+                  Register
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Form Fields */}
-            {!isLogin && (
-              <CustomInputField
-                label="Full Name"
-                value={formData.name}
-                onChangeText={(text) => updateFormData('name', text)}
-                placeholder="Enter your full name"
-                icon="person-outline"
-                iconFamily="ionicons"
-              />
+            {isLogin ? (
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Mail size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Email"
+                    placeholderTextColor="#6B7280"
+                    value={loginEmail}
+                    onChangeText={setLoginEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Lock size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Password"
+                    placeholderTextColor="#6B7280"
+                    value={loginPassword}
+                    onChangeText={setLoginPassword}
+                    secureTextEntry={!showPassword}
+                    autoComplete="current-password"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} color="#6B7280" />
+                    ) : (
+                      <Eye size={20} color="#6B7280" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.submitButton, loading && styles.disabledButton]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Login</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.form}>
+                <View style={styles.inputRow}>
+                  <View style={[styles.inputContainer, styles.halfInput]}>
+                    <User size={20} color="#6B7280" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="First Name"
+                      placeholderTextColor="#6B7280"
+                      value={firstName}
+                      onChangeText={setFirstName}
+                      autoComplete="given-name"
+                    />
+                  </View>
+                  <View style={[styles.inputContainer, styles.halfInput]}>
+                    <User size={20} color="#6B7280" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Last Name"
+                      placeholderTextColor="#6B7280"
+                      value={lastName}
+                      onChangeText={setLastName}
+                      autoComplete="family-name"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Mail size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Email"
+                    placeholderTextColor="#6B7280"
+                    value={registerEmail}
+                    onChangeText={setRegisterEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Phone size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#6B7280"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Lock size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Password"
+                    placeholderTextColor="#6B7280"
+                    value={registerPassword}
+                    onChangeText={setRegisterPassword}
+                    secureTextEntry={!showPassword}
+                    autoComplete="new-password"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} color="#6B7280" />
+                    ) : (
+                      <Eye size={20} color="#6B7280" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.submitButton, loading && styles.disabledButton]}
+                  onPress={handleRegister}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Create Account</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             )}
-
-            <CustomInputField
-              label="Email"
-              value={formData.email}
-              onChangeText={(text) => updateFormData('email', text)}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              icon="mail-outline"
-              iconFamily="ionicons"
-            />
-
-            <CustomInputField
-              label="Password"
-              value={formData.password}
-              onChangeText={(text) => updateFormData('password', text)}
-              placeholder="Enter your password"
-              secureTextEntry={!showPassword}
-              showPasswordToggle={true}
-              showPassword={showPassword}
-              onPasswordToggle={() => setShowPassword(!showPassword)}
-              icon="lock-closed-outline"
-              iconFamily="ionicons"
-            />
-
-            {!isLogin && (
-              <>
-                <CustomInputField
-                  label="Confirm Password"
-                  value={formData.confirmPassword}
-                  onChangeText={(text) => updateFormData('confirmPassword', text)}
-                  placeholder="Confirm your password"
-                  secureTextEntry={!showConfirmPassword}
-                  showPasswordToggle={true}
-                  showPassword={showConfirmPassword}
-                  onPasswordToggle={() => setShowConfirmPassword(!showConfirmPassword)}
-                  icon="lock-closed-outline"
-                  iconFamily="ionicons"
-                />
-
-                <CustomInputField
-                  label="Phone Number"
-                  value={formData.phone}
-                  onChangeText={(text) => updateFormData('phone', text)}
-                  placeholder="Enter your phone number"
-                  keyboardType="phone-pad"
-                  icon="call-outline"
-                  iconFamily="ionicons"
-                />
-
-                <CustomInputField
-                  label="Emergency Contact Name"
-                  value={formData.emergencyContact}
-                  onChangeText={(text) => updateFormData('emergencyContact', text)}
-                  placeholder="Emergency contact name"
-                  icon="people-outline"
-                  iconFamily="ionicons"
-                />
-
-                <CustomInputField
-                  label="Emergency Contact Phone"
-                  value={formData.emergencyPhone}
-                  onChangeText={(text) => updateFormData('emergencyPhone', text)}
-                  placeholder="Emergency contact phone"
-                  keyboardType="phone-pad"
-                  icon="call-outline"
-                  iconFamily="ionicons"
-                />
-              </>
-            )}
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.submitButton, isLoading && styles.disabledButton]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              <LinearGradient
-                colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
-                style={styles.submitGradient}
-              >
-                {isLoading ? (
-                  <Text style={styles.submitText}>Processing...</Text>
-                ) : (
-                  <Text style={styles.submitText}>
-                    {isLogin ? 'Login' : 'Create Account'}
-                  </Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Footer */}
-            {isLogin && (
-              <TouchableOpacity style={styles.forgotPassword}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
-            )}
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-              </Text>
-              <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-                <Text style={styles.footerLink}>
-                  {isLogin ? 'Sign Up' : 'Login'}
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </ScrollView>
       </LinearGradient>
@@ -304,24 +350,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
+  gradient: {
+    flex: 1,
+  },
+  scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 40,
   },
   header: {
     alignItems: 'center',
     marginBottom: 40,
-  },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
   },
   title: {
     fontSize: 32,
@@ -332,10 +372,9 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
   },
   formContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
     padding: 24,
     shadowColor: '#000',
@@ -361,7 +400,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   activeToggle: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#3B82F6',
   },
   toggleText: {
     fontSize: 16,
@@ -371,45 +410,50 @@ const styles = StyleSheet.create({
   activeToggleText: {
     color: '#FFFFFF',
   },
-  submitButton: {
-    marginTop: 24,
-    marginBottom: 16,
+  form: {
+    gap: 16,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  halfInput: {
+    flex: 1,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+  },
+  eyeIcon: {
+    padding: 4,
+  },
+  submitButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
   },
   disabledButton: {
     opacity: 0.7,
   },
-  submitGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  submitText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  submitButtonText: {
     color: '#FFFFFF',
-  },
-  forgotPassword: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: '#2563EB',
-    fontWeight: '600',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  footerLink: {
-    fontSize: 14,
-    color: '#2563EB',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

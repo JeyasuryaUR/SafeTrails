@@ -1,276 +1,380 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  StatusBar,
   ScrollView,
-  Alert,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
   KeyboardAvoidingView,
-  Platform
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeTrails } from '@/contexts/SafeTrailsContext';
-import { CustomInputField } from '@/components/CustomInputField';
-
-interface KYCFormData {
-  aadharNumber: string;
-  dateOfBirth: string;
-}
+import { 
+  FileText, 
+  User, 
+  Calendar, 
+  MapPin, 
+  Phone, 
+  Mail, 
+  CheckCircle, 
+  Clock,
+  AlertCircle,
+  XCircle 
+} from 'lucide-react-native';
+import Toast from 'react-native-toast-message';
 
 export default function KYCScreen() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<KYCFormData>({
-    aadharNumber: '',
-    dateOfBirth: ''
+  const { submitKYC, checkKYCStatus, kycStatus, isAuthenticated } = useSafeTrails();
+  const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [currentKycStatus, setCurrentKycStatus] = useState<string>('PENDING');
+  
+  // KYC Form data
+  const [formData, setFormData] = useState({
+    aadhaarNumber: '',
+    fullName: '',
+    dateOfBirth: '',
+    address: '',
+    phoneNumber: '',
+    email: '',
+    documentType: 'AADHAAR' as const,
+    documentNumber: '',
+    documentImage: 'placeholder_document_base64',
+    selfieImage: 'placeholder_selfie_base64',
   });
-  const safeTrailsContext = useSafeTrails();
-  const { completeKYC } = safeTrailsContext;
 
-  const updateFormData = (field: keyof KYCFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const formatAadharNumber = (text: string) => {
-    // Remove all non-digits
-    const cleaned = text.replace(/\D/g, '');
-    // Limit to 12 digits and add spaces every 4 digits
-    const limited = cleaned.substring(0, 12);
-    return limited.replace(/(\d{4})(?=\d)/g, '$1 ');
-  };
-
-  const formatDateOfBirth = (text: string) => {
-    // Remove all non-digits
-    const cleaned = text.replace(/\D/g, '');
-    // Limit to 8 digits (DDMMYYYY)
-    const limited = cleaned.substring(0, 8);
-    // Add slashes
-    let formatted = limited;
-    if (limited.length >= 2) {
-      formatted = limited.substring(0, 2) + '/' + limited.substring(2);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/auth');
+      return;
     }
-    if (limited.length >= 4) {
-      formatted = limited.substring(0, 2) + '/' + limited.substring(2, 4) + '/' + limited.substring(4);
+    loadKYCStatus(false); // Don't navigate on initial load
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadKYCStatus = async (shouldNavigate: boolean = false) => {
+    try {
+      setStatusLoading(true);
+      const result = await checkKYCStatus(shouldNavigate);
+      setCurrentKycStatus(result?.status || kycStatus);
+    } catch (error) {
+      console.log('Error checking KYC status:', error);
+    } finally {
+      setStatusLoading(false);
     }
-    return formatted;
-  };
-
-  const handleAadharChange = (text: string) => {
-    const formatted = formatAadharNumber(text);
-    updateFormData('aadharNumber', formatted);
-  };
-
-  const handleDOBChange = (text: string) => {
-    const formatted = formatDateOfBirth(text);
-    updateFormData('dateOfBirth', formatted);
   };
 
   const validateForm = () => {
-    const aadharDigits = formData.aadharNumber.replace(/\s/g, '');
-
-    if (!aadharDigits || aadharDigits.length !== 12) {
-      Alert.alert('Error', 'Please enter a valid 12-digit Aadhar number');
+    const { aadhaarNumber, fullName, dateOfBirth, address, phoneNumber, email } = formData;
+    
+    if (!aadhaarNumber || aadhaarNumber.length !== 12) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Aadhaar',
+        text2: 'Please enter a valid 12-digit Aadhaar number',
+      });
       return false;
     }
 
-    if (!formData.dateOfBirth || formData.dateOfBirth.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid date of birth (DD/MM/YYYY)');
+    if (!fullName || fullName.length < 2) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Name',
+        text2: 'Please enter your full name',
+      });
       return false;
     }
 
-    // Validate date format
-    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    const match = formData.dateOfBirth.match(dateRegex);
-
-    if (!match) {
-      Alert.alert('Error', 'Please enter date in DD/MM/YYYY format');
+    if (!dateOfBirth) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing Date',
+        text2: 'Please enter your date of birth',
+      });
       return false;
     }
 
-    const [, day, month, year] = match;
-    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    const now = new Date();
-
-    if (date > now) {
-      Alert.alert('Error', 'Date of birth cannot be in the future');
+    if (!address || address.length < 10) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Address',
+        text2: 'Please enter your complete address',
+      });
       return false;
     }
 
-    const age = now.getFullYear() - date.getFullYear();
-    if (age < 13 || age > 120) {
-      Alert.alert('Error', 'Please enter a valid date of birth');
+    if (!phoneNumber || phoneNumber.length < 10) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Phone',
+        text2: 'Please enter a valid phone number',
+      });
+      return false;
+    }
+
+    if (!email || !email.includes('@')) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Email',
+        text2: 'Please enter a valid email address',
+      });
       return false;
     }
 
     return true;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmitKYC = async () => {
     if (!validateForm()) return;
 
-    setIsLoading(true);
-
+    setLoading(true);
     try {
-      // Simulate API call for KYC verification
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Store KYC data
-      await completeKYC({
-        aadharNumber: formData.aadharNumber.replace(/\s/g, ''),
-        dateOfBirth: formData.dateOfBirth
+      await submitKYC(formData);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'KYC Submitted!',
+        text2: 'Your application is being reviewed',
       });
-
-      // Alert.alert(
-      //   'KYC Verification Successful',
-      //   'Your identity has been verified successfully. Welcome to SafeTrails!',
-      //   [
-      //     {
-      //       text: 'Continue',
-      //       onPress: () => {
-              router.replace('/(tabs)/dashboard');
-      //       }
-      //     }
-      //   ]
-      // );
-    } catch {
-      Alert.alert('Error', 'KYC verification failed. Please try again.');
+      
+      // Refresh status after submission - enable navigation in case it's instantly approved
+      await loadKYCStatus(true);
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Submission Failed',
+        text2: error.message || 'Failed to submit KYC application',
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  const handleGoToDashboard = () => {
+    router.replace('/(tabs)/dashboard');
+  };
+
+  const getStatusIcon = () => {
+    switch (currentKycStatus) {
+      case 'APPROVED':
+        return <CheckCircle size={24} color="#10B981" />;
+      case 'REJECTED':
+        return <XCircle size={24} color="#EF4444" />;
+      case 'UNDER_REVIEW':
+      case 'SUBMITTED':
+        return <Clock size={24} color="#F59E0B" />;
+      default:
+        return <AlertCircle size={24} color="#6B7280" />;
+    }
+  };
+
+  const getStatusMessage = () => {
+    switch (currentKycStatus) {
+      case 'APPROVED':
+        return {
+          title: 'KYC Verified ✓',
+          message: 'Your identity has been successfully verified. You can now access all SafeTrails features.',
+          color: '#10B981',
+        };
+      case 'REJECTED':
+        return {
+          title: 'KYC Rejected',
+          message: 'Your application was rejected. Please contact support or submit a new application.',
+          color: '#EF4444',
+        };
+      case 'UNDER_REVIEW':
+        return {
+          title: 'Under Review',
+          message: 'Your KYC application is being reviewed by our team. This usually takes 24-48 hours.',
+          color: '#F59E0B',
+        };
+      case 'SUBMITTED':
+        return {
+          title: 'Application Submitted',
+          message: 'Your KYC application has been submitted and is awaiting review.',
+          color: '#F59E0B',
+        };
+      default:
+        return {
+          title: 'KYC Verification Required',
+          message: 'Complete your KYC verification to access all SafeTrails features.',
+          color: '#6B7280',
+        };
+    }
+  };
+
+  if (statusLoading) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={['#1E40AF', '#2563EB', '#3B82F6']} style={styles.gradient}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>Checking KYC Status...</Text>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
+
+  const statusInfo = getStatusMessage();
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
+    <KeyboardAvoidingView 
+      style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
-      <LinearGradient
-        colors={['#1E40AF', '#2563EB', '#3B82F6']}
-        style={styles.container}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
+      <LinearGradient colors={['#1E40AF', '#2563EB', '#3B82F6']} style={styles.gradient}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <MaterialIcons name="verified-user" size={60} color="#FFFFFF" />
-            </View>
-            <Text style={styles.title}>Identity Verification</Text>
-            <Text style={styles.subtitle}>
-              Complete your KYC to ensure secure travel verification
-            </Text>
+            <Text style={styles.title}>KYC Verification</Text>
+            <Text style={styles.subtitle}>Identity Verification</Text>
           </View>
 
-          {/* Form Container */}
-          <View style={styles.formContainer}>
-            <View style={styles.stepIndicator}>
-              <View style={styles.stepItem}>
-                <View style={[styles.stepCircle, styles.completedStep]}>
-                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                </View>
-                <Text style={[styles.stepText, styles.completedStepText]}>Account</Text>
-              </View>
-
-              <View style={styles.stepLine} />
-
-              <View style={styles.stepItem}>
-                <View style={[styles.stepCircle, styles.activeStep]}>
-                  <Text style={styles.stepNumber}>2</Text>
-                </View>
-                <Text style={[styles.stepText, styles.activeStepText]}>KYC</Text>
-              </View>
-
-              <View style={styles.stepLine} />
-
-              <View style={styles.stepItem}>
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>3</Text>
-                </View>
-                <Text style={styles.stepText}>Onboarding</Text>
-              </View>
-            </View>
-
-            {/* Info Card */}
-            <View style={styles.infoCard}>
-              <MaterialIcons name="info" size={24} color="#2563EB" />
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoTitle}>Why do we need this?</Text>
-                <Text style={styles.infoText}>
-                  Your Aadhar details help us create a secure digital identity for safe travel verification.
+          {/* Status Card */}
+          <View style={styles.statusCard}>
+            <View style={styles.statusHeader}>
+              {getStatusIcon()}
+              <View style={styles.statusTextContainer}>
+                <Text style={[styles.statusTitle, { color: statusInfo.color }]}>
+                  {statusInfo.title}
                 </Text>
+                <Text style={styles.statusMessage}>{statusInfo.message}</Text>
               </View>
             </View>
 
-            {/* Form Fields */}
-            <CustomInputField
-              label="Aadhar Number"
-              value={formData.aadharNumber}
-              onChangeText={handleAadharChange}
-              placeholder="1234 5678 9012"
-              keyboardType="numeric"
-              icon="credit-card"
-              iconFamily="material"
-              maxLength={14}
-            />
-
-            <CustomInputField
-              label="Date of Birth"
-              value={formData.dateOfBirth}
-              onChangeText={handleDOBChange}
-              placeholder="DD/MM/YYYY"
-              keyboardType="numeric"
-              icon="cake"
-              iconFamily="material"
-              maxLength={10}
-            />
-
-            {/* Security Notice */}
-            <View style={styles.securityNotice}>
-              <MaterialIcons name="security" size={20} color="#10B981" />
-              <Text style={styles.securityText}>
-                Your information is encrypted and stored securely
-              </Text>
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.submitButton, isLoading && styles.disabledButton]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              <LinearGradient
-                colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
-                style={styles.submitGradient}
-              >
-                {isLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <MaterialIcons name="verified-user" size={20} color="#FFFFFF" />
-                    <Text style={styles.submitText}>Verifying...</Text>
-                  </View>
-                ) : (
-                  <View style={styles.loadingContainer}>
-                    <MaterialIcons name="verified-user" size={20} color="#FFFFFF" />
-                    <Text style={styles.submitText}>Verify Identity</Text>
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Footer */}
-            <View style={styles.footer}>
-              <MaterialIcons name="lock" size={16} color="#6B7280" />
-              <Text style={styles.footerText}>
-                Protected by 256-bit SSL encryption
-              </Text>
-            </View>
+            {currentKycStatus === 'APPROVED' && (
+              <TouchableOpacity style={styles.dashboardButton} onPress={handleGoToDashboard}>
+                <Text style={styles.dashboardButtonText}>Go to Dashboard</Text>
+              </TouchableOpacity>
+            )}
           </View>
+
+          {/* Show form only if KYC is pending or rejected */}
+          {(currentKycStatus === 'PENDING' || currentKycStatus === 'REJECTED') && (
+            <View style={styles.formContainer}>
+              <Text style={styles.formTitle}>Complete Your KYC</Text>
+              <Text style={styles.formSubtitle}>
+                Please provide accurate information for identity verification
+              </Text>
+
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <FileText size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Aadhaar Number"
+                    placeholderTextColor="#6B7280"
+                    value={formData.aadhaarNumber}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, aadhaarNumber: text }))}
+                    keyboardType="numeric"
+                    maxLength={12}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <User size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Full Name (as per Aadhaar)"
+                    placeholderTextColor="#6B7280"
+                    value={formData.fullName}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, fullName: text }))}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Calendar size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Date of Birth (DD/MM/YYYY)"
+                    placeholderTextColor="#6B7280"
+                    value={formData.dateOfBirth}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, dateOfBirth: text }))}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <MapPin size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.textInput, styles.multilineInput]}
+                    placeholder="Complete Address"
+                    placeholderTextColor="#6B7280"
+                    value={formData.address}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, address: text }))}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Phone size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#6B7280"
+                    value={formData.phoneNumber}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, phoneNumber: text }))}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Mail size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Email Address"
+                    placeholderTextColor="#6B7280"
+                    value={formData.email}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <FileText size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Document Number"
+                    placeholderTextColor="#6B7280"
+                    value={formData.documentNumber}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, documentNumber: text }))}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.submitButton, loading && styles.disabledButton]}
+                  onPress={handleSubmitKYC}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Submit KYC Application</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Show message for submitted/under review */}
+          {(currentKycStatus === 'SUBMITTED' || currentKycStatus === 'UNDER_REVIEW') && (
+            <View style={styles.waitingCard}>
+              <Text style={styles.waitingTitle}>Application In Progress</Text>
+              <Text style={styles.waitingMessage}>
+                Your KYC application is being processed. We&apos;ll notify you once the verification is complete.
+              </Text>
+              <TouchableOpacity style={styles.refreshButton} onPress={() => loadKYCStatus(true)}>
+                <Text style={styles.refreshButtonText}>Refresh Status</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
@@ -281,207 +385,173 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
+  gradient: {
+    flex: 1,
+  },
+  scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 16,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 32,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 8,
-    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    paddingHorizontal: 20,
   },
-  formContainer: {
-    backgroundColor: '#FFFFFF',
+  statusCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
     padding: 24,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
   },
-  stepIndicator: {
+  statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 32,
   },
-  stepItem: {
-    alignItems: 'center',
-  },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  activeStep: {
-    backgroundColor: '#2563EB',
-  },
-  completedStep: {
-    backgroundColor: '#10B981',
-  },
-  stepNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#6B7280',
-  },
-  stepText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  activeStepText: {
-    color: '#2563EB',
-    fontWeight: '600',
-  },
-  completedStepText: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  stepLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 8,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EBF8FF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2563EB',
-  },
-  infoTextContainer: {
+  statusTextContainer: {
+    marginLeft: 16,
     flex: 1,
-    marginLeft: 12,
   },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E40AF',
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 4,
   },
-  infoText: {
-    fontSize: 13,
-    color: '#1E40AF',
-    lineHeight: 18,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
+  statusMessage: {
     fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  dashboardButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  dashboardButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
+  },
+  formContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
     marginBottom: 8,
   },
-  inputWrapper: {
+  formSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 24,
+  },
+  form: {
+    gap: 16,
+  },
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 0,
-    borderRadius: 12,
     backgroundColor: '#F9FAFB',
+    borderRadius: 12,
     paddingHorizontal: 16,
-    minHeight: 56,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   inputIcon: {
     marginRight: 12,
   },
   textInput: {
     flex: 1,
-    paddingVertical: 16,
     fontSize: 16,
-    color: '#1F2937',
+    color: '#111827',
   },
-  securityNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F0FDF4',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  securityText: {
-    fontSize: 13,
-    color: '#059669',
-    fontWeight: '500',
-    marginLeft: 8,
+  multilineInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   submitButton: {
-    marginBottom: 16,
+    backgroundColor: '#3B82F6',
     borderRadius: 12,
-    overflow: 'hidden',
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
   },
   disabledButton: {
     opacity: 0.7,
   },
-  submitGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  submitText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  submitButtonText: {
     color: '#FFFFFF',
-    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  waitingCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
-    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  footerText: {
-    fontSize: 12,
+  waitingTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  waitingMessage: {
+    fontSize: 14,
     color: '#6B7280',
-    marginLeft: 6,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  refreshButton: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  refreshButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

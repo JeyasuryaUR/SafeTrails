@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   Animated,
   Alert,
 } from 'react-native';
@@ -16,17 +15,16 @@ import {
   AlertTriangle, 
   TrendingUp,
   CheckCircle,
-  Clock,
   Globe,
   Activity,
   Users,
-  Zap,
-  Navigation
+  Navigation,
+  Play,
+  BarChart3,
+  Timer
 } from 'lucide-react-native';
 import { useSafeTrails } from '@/contexts/SafeTrailsContext';
 import { router } from 'expo-router';
-
-const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const { 
@@ -35,14 +33,14 @@ export default function DashboardScreen() {
     language, 
     toggleLanguage, 
     isInDangerZone,
-    lastLocationUpdate,
-    communityReports,
-    updateSafetyScore,
-    simulateLocationUpdate 
+    tripStatistics,
+    user
   } = useSafeTrails();
 
   const [animatedScore] = useState(new Animated.Value(safetyScore.overall));
-  const [isLive, setIsLive] = useState(true);
+  
+  // Determine if user is currently on a trip
+  const isOnActiveTrip = user?.isActive === true;
 
   useEffect(() => {
     // Animate score changes
@@ -51,48 +49,58 @@ export default function DashboardScreen() {
       duration: 1000,
       useNativeDriver: false,
     }).start();
-  }, [safetyScore.overall]);
+  }, [safetyScore.overall, animatedScore]);
 
-  const handleEmergencyAlert = () => {
+  const handleStartTrip = () => {
+    // TODO: Navigate to trip creation/start screen
     Alert.alert(
-      '🚨 Emergency Alert Sent!',
-      'Your location and emergency status has been shared with:\n• Emergency Services (112)\n• Tourist Helpline (1363)\n• Fellow tourists nearby\n• Emergency contacts',
-      [{ text: 'OK', style: 'default' }]
+      '� Start New Trip',
+      'You will be redirected to create a new trip. This will guide you through planning your safe journey.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', onPress: () => {
+          // TODO: Navigate to trip creation screen
+          console.log('Navigate to trip creation...');
+        }}
+      ]
     );
   };
 
-  const getTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const past = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - past.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    const hours = Math.floor(diffInMinutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+  const handleManageTrip = () => {
+    Alert.alert(
+      '📍 Manage Active Trip',
+      'Your current trip: ' + (tripStatistics.activeTripTitle || 'Unknown Trip'),
+      [
+        { text: 'View Details', onPress: () => console.log('View trip details...') },
+        { text: 'End Trip', style: 'destructive', onPress: () => console.log('End trip...') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatDuration = (hours: number) => {
+    if (hours < 24) return `${hours.toFixed(1)}h`;
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    const remainingHours = hours % 24;
+    return `${days}d ${remainingHours.toFixed(0)}h`;
   };
 
   const renderSafetyGauge = () => {
     const percentage = safetyScore.overall;
-    const circumference = 2 * Math.PI * 45;
-    const strokeDasharray = circumference;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     return (
       <View style={styles.gaugeContainer}>
         <View style={styles.gauge}>
-          <View style={styles.gaugeBackground} />
-          <View 
-            style={[
-              styles.gaugeFill,
-              { 
-                transform: [{ rotate: `${(percentage / 100) * 180}deg` }],
-                backgroundColor: percentage >= 70 ? '#10B981' : percentage >= 40 ? '#F59E0B' : '#EF4444'
-              }
-            ]} 
-          />
           <View style={styles.gaugeCenter}>
             <Text style={styles.gaugeScore}>{percentage}</Text>
             <Text style={styles.gaugeLabel}>Safety Score</Text>
@@ -108,6 +116,176 @@ export default function DashboardScreen() {
       </View>
     );
   };
+
+  // Render different content based on trip status
+  const renderDashboardContent = () => {
+    if (isOnActiveTrip) {
+      return renderActiveTripDashboard();
+    } else {
+      return renderNoTripDashboard();
+    }
+  };
+
+  const renderNoTripDashboard = () => (
+    <>
+      {/* Trip Statistics Section */}
+      <View style={styles.statsSection}>
+        <Text style={styles.sectionTitle}>Your Travel Statistics</Text>
+        
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#3B82F6' }]}>
+              <BarChart3 color="white" size={20} />
+            </View>
+            <Text style={styles.statValue}>{tripStatistics.totalTrips}</Text>
+            <Text style={styles.statLabel}>Total Trips</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#10B981' }]}>
+              <CheckCircle color="white" size={20} />
+            </View>
+            <Text style={styles.statValue}>{tripStatistics.completedTrips}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#F59E0B' }]}>
+              <Navigation color="white" size={20} />
+            </View>
+            <Text style={styles.statValue}>{tripStatistics.totalDistance.toFixed(0)}km</Text>
+            <Text style={styles.statLabel}>Total Distance</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#8B5CF6' }]}>
+              <Timer color="white" size={20} />
+            </View>
+            <Text style={styles.statValue}>{formatDuration(tripStatistics.totalTimeSpent)}</Text>
+            <Text style={styles.statLabel}>Time Traveled</Text>
+          </View>
+        </View>
+
+        <View style={styles.additionalStats}>
+          <View style={styles.additionalStatRow}>
+            <Text style={styles.additionalStatLabel}>Average Safety Score</Text>
+            <Text style={styles.additionalStatValue}>{tripStatistics.averageSafetyScore.toFixed(1)}/100</Text>
+          </View>
+          <View style={styles.additionalStatRow}>
+            <Text style={styles.additionalStatLabel}>Last Trip</Text>
+            <Text style={styles.additionalStatValue}>{formatDate(tripStatistics.lastTripDate)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Start Trip Section */}
+      <View style={styles.startTripSection}>
+        <Text style={styles.sectionTitle}>Ready for Your Next Adventure?</Text>
+        <Text style={styles.sectionSubtitle}>
+          Plan and start a new safe journey with real-time monitoring and community support.
+        </Text>
+        
+        <TouchableOpacity style={styles.startTripButton} onPress={handleStartTrip}>
+          <Play color="white" size={24} />
+          <Text style={styles.startTripButtonText}>Start New Trip</Text>
+        </TouchableOpacity>
+
+        <View style={styles.features}>
+          <View style={styles.feature}>
+            <Shield color="#3B82F6" size={20} />
+            <Text style={styles.featureText}>Real-time safety monitoring</Text>
+          </View>
+          <View style={styles.feature}>
+            <MapPin color="#10B981" size={20} />
+            <Text style={styles.featureText}>GPS tracking & alerts</Text>
+          </View>
+          <View style={styles.feature}>
+            <Users color="#F59E0B" size={20} />
+            <Text style={styles.featureText}>Community support network</Text>
+          </View>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderActiveTripDashboard = () => (
+    <>
+      {/* Current Trip Status */}
+      <View style={styles.activeTripSection}>
+        <View style={styles.activeTripHeader}>
+          <View style={styles.tripStatusBadge}>
+            <Activity color="white" size={16} />
+            <Text style={styles.tripStatusText}>ACTIVE TRIP</Text>
+          </View>
+          <TouchableOpacity style={styles.manageTripButton} onPress={handleManageTrip}>
+            <Text style={styles.manageTripText}>Manage</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <Text style={styles.activeTripTitle}>{tripStatistics.activeTripTitle}</Text>
+        <Text style={styles.activeTripDate}>
+          Started: {formatDate(tripStatistics.activeTripStartDate)}
+        </Text>
+      </View>
+
+      {/* Safety Gauge for Active Trip */}
+      {renderSafetyGauge()}
+
+      {/* Trip Metrics */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIcon, { backgroundColor: '#10B981' }]}>
+            <MapPin color="white" size={20} />
+          </View>
+          <Text style={styles.metricValue}>{safetyScore.routeRisk}</Text>
+          <Text style={styles.metricLabel}>Route Safety</Text>
+        </View>
+
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIcon, { backgroundColor: '#3B82F6' }]}>
+            <CheckCircle color="white" size={20} />
+          </View>
+          <Text style={styles.metricValue}>{safetyScore.itineraryChecks}</Text>
+          <Text style={styles.metricLabel}>Itinerary Checks</Text>
+        </View>
+
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIcon, { backgroundColor: '#F59E0B' }]}>
+            <TrendingUp color="white" size={20} />
+          </View>
+          <Text style={styles.metricValue}>{safetyScore.activeness}</Text>
+          <Text style={styles.metricLabel}>Activity Level</Text>
+        </View>
+      </View>
+
+      {/* Quick Actions for Active Trip */}
+      <View style={styles.quickActions}>
+        <Text style={styles.sectionTitle}>Trip Actions</Text>
+        
+        <TouchableOpacity 
+          style={styles.actionCard}
+          onPress={() => router.push('/(tabs)/map')}
+        >
+          <MapPin color="#10B981" size={24} />
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Live Location</Text>
+            <Text style={styles.actionSubtitle}>View current position & route</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.actionCard, styles.emergencyCard]}
+          onPress={() => router.push('/sos')}
+        >
+          <AlertTriangle color="#EF4444" size={24} />
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Emergency SOS</Text>
+            <Text style={styles.actionSubtitle}>Immediate help & alert contacts</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -141,87 +319,7 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
-        {renderSafetyGauge()}
-
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#10B981' }]}>
-              <MapPin color="white" size={20} />
-            </View>
-            <Text style={styles.metricValue}>{safetyScore.routeRisk}</Text>
-            <Text style={styles.metricLabel}>Route Safety</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#3B82F6' }]}>
-              <CheckCircle color="white" size={20} />
-            </View>
-            <Text style={styles.metricValue}>{safetyScore.itineraryChecks}</Text>
-            <Text style={styles.metricLabel}>Itinerary Checks</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#F59E0B' }]}>
-              <TrendingUp color="white" size={20} />
-            </View>
-            <Text style={styles.metricValue}>{safetyScore.activeness}</Text>
-            <Text style={styles.metricLabel}>Activity Level</Text>
-          </View>
-        </View>
-
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/digital-id')}
-          >
-            <Shield color="#2563EB" size={24} />
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>View Digital ID</Text>
-              <Text style={styles.actionSubtitle}>Blockchain verified identity</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/map')}
-          >
-            <MapPin color="#10B981" size={24} />
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Check Route Safety</Text>
-              <Text style={styles.actionSubtitle}>View real-time risk zones</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.actionCard, styles.emergencyCard]}
-            onPress={() => router.push('/sos')}
-          >
-            <AlertTriangle color="#EF4444" size={24} />
-            <View style={styles.actionContent}>
-              <Text style={[styles.actionTitle, { color: '#EF4444' }]}>Emergency SOS</Text>
-              <Text style={styles.actionSubtitle}>Instant help & location sharing</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.tripInfo}>
-          <Text style={styles.sectionTitle}>Current Trip</Text>
-          <View style={styles.tripCard}>
-            <View style={styles.tripHeader}>
-              <Text style={styles.tripTitle}>India Heritage Tour</Text>
-              <View style={styles.tripStatus}>
-                <Clock color="#10B981" size={16} />
-                <Text style={styles.tripStatusText}>Active</Text>
-              </View>
-            </View>
-            <Text style={styles.tripDates}>
-              {touristProfile.tripValidFrom} - {touristProfile.tripValidTo}
-            </Text>
-            <Text style={styles.tripId}>Trip ID: {touristProfile.id}</Text>
-          </View>
-        </View>
+        {renderDashboardContent()}
       </View>
     </ScrollView>
   );
@@ -464,5 +562,202 @@ const styles = StyleSheet.create({
   tripId: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  // New styles for dynamic dashboard
+  statsSection: {
+    marginBottom: 24,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  additionalStats: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  additionalStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  additionalStatLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  additionalStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  startTripSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  startTripButton: {
+    backgroundColor: '#10B981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  startTripButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  features: {
+    gap: 8,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  activeTripSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  currentTripHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  currentTripTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  activeBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  activeBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tripActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  tripAction: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  emergencyAction: {
+    backgroundColor: '#FEE2E2',
+  },
+  tripActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 4,
+  },
+  emergencyActionText: {
+    color: '#EF4444',
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  feature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activeTripHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  tripStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  manageTripButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  manageTripText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeTripTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  activeTripDate: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
   },
 });

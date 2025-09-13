@@ -1,6 +1,17 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { 
+  AuthAPI, 
+  RegisterRequest, 
+  LoginRequest, 
+  KYCSubmitRequest,
+  ApiError,
+  UserProfile,
+  KYCStatusResponse
+} from '@/services/auth';
+import Toast from 'react-native-toast-message';
 
 export interface TouristProfile {
   id: string;
@@ -54,26 +65,43 @@ export interface ItineraryItem {
 
 export interface User {
   id: string;
-  name: string;
   email: string;
+  firstName: string;
+  lastName: string;
   phone: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  aadharNumber?: string;
-  dateOfBirth?: string;
+  isActive?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TripStatistics {
+  totalTrips: number;
+  completedTrips: number;
+  activeTripId?: string;
+  activeTripTitle?: string;
+  activeTripStartDate?: string;
+  totalDistance: number; // in km
+  averageSafetyScore: number;
+  lastTripDate?: string;
+  totalTimeSpent: number; // in hours
 }
 
 export interface KYCData {
-  aadharNumber: string;
+  aadhaarNumber: string;
   dateOfBirth: string;
 }
 
 export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
+  // ============================================================================
+  // AUTHENTICATION STATE & FUNCTIONS
+  // ============================================================================
+
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(false);
   const [hasCompletedKYC, setHasCompletedKYC] = useState<boolean>(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [kycStatus, setKycStatus] = useState<'PENDING' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isInDangerZone, setIsInDangerZone] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
@@ -229,9 +257,22 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     }
   ]);
 
+  // Trip Statistics State
+  const [tripStatistics, setTripStatistics] = useState<TripStatistics>({
+    totalTrips: 5,
+    completedTrips: 4,
+    activeTripId: user?.isActive ? 'trip-001' : undefined,
+    activeTripTitle: user?.isActive ? 'Delhi Heritage Tour' : undefined,
+    activeTripStartDate: user?.isActive ? '2025-09-13T10:00:00Z' : undefined,
+    totalDistance: 234.7,
+    averageSafetyScore: 89.2,
+    lastTripDate: '2025-09-10T18:30:00Z',
+    totalTimeSpent: 48.5,
+  });
+
   useEffect(() => {
     loadAppState();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAppState = async () => {
     try {
@@ -243,16 +284,75 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
       ]);
 
       setHasCompletedOnboarding(onboardingStatus === 'true');
-      setHasCompletedKYC(kycStatus === 'true');
       setIsAuthenticated(authStatus === 'true');
 
       if (userData) {
         setUser(JSON.parse(userData));
       }
+
+      // If authenticated, check KYC status from API
+      if (authStatus === 'true') {
+        await checkKYCStatus();
+      } else {
+        setHasCompletedKYC(kycStatus === 'true');
+      }
     } catch (error) {
       console.log('Error loading app state:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load app data. Please restart the app.',
+      });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /**
+   * Check KYC status from API
+   * TODO: This will call the real backend when ready
+   */
+  const checkKYCStatus = async (shouldNavigate: boolean = false) => {
+    try {
+      const response = await AuthAPI.getKYCStatus();
+      
+      if (response.kycApplication) {
+        const status = response.kycApplication.status;
+        const wasApproved = status === 'APPROVED';
+        
+        setKycStatus(status);
+        setHasCompletedKYC(wasApproved);
+        
+        // Save KYC status to local storage for offline access
+        await AsyncStorage.setItem('hasCompletedKYC', wasApproved ? 'true' : 'false');
+        await AsyncStorage.setItem('kycApplicationStatus', status);
+        
+        // Navigate to dashboard if KYC is approved and navigation is requested
+        if (shouldNavigate && wasApproved) {
+          Toast.show({
+            type: 'success',
+            text1: 'KYC Approved! 🎉',
+            text2: 'Welcome to SafeTrails dashboard',
+          });
+          
+          setTimeout(() => {
+            router.replace('/(tabs)/dashboard');
+          }, 1500);
+        }
+        
+        return { status, wasApproved };
+      } else {
+        setKycStatus('PENDING');
+        setHasCompletedKYC(false);
+        await AsyncStorage.setItem('hasCompletedKYC', 'false');
+        return { status: 'PENDING', wasApproved: false };
+      }
+    } catch (error) {
+      console.log('Error checking KYC status:', error);
+      // Fall back to local storage value if API fails
+      const localKycStatus = await AsyncStorage.getItem('hasCompletedKYC');
+      setHasCompletedKYC(localKycStatus === 'true');
+      return { status: 'ERROR', wasApproved: localKycStatus === 'true' };
     }
   };
 
@@ -262,27 +362,6 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
       setHasCompletedOnboarding(true);
     } catch (error) {
       console.log('Error saving onboarding status:', error);
-    }
-  };
-
-  const completeKYC = async (kycData: KYCData) => {
-    try {
-      const updatedUser = {
-        ...user!,
-        aadharNumber: kycData.aadharNumber,
-        dateOfBirth: kycData.dateOfBirth
-      };
-
-      await Promise.all([
-        AsyncStorage.setItem('hasCompletedKYC', 'true'),
-        AsyncStorage.setItem('user', JSON.stringify(updatedUser))
-      ]);
-
-      setHasCompletedKYC(true);
-      setUser(updatedUser);
-    } catch (error) {
-      console.log('Error saving KYC status:', error);
-      throw error;
     }
   };
 
@@ -308,67 +387,247 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     setLanguage(prev => prev === 'en' ? 'hi' : 'en');
   };
 
-  const login = async (email: string, password: string) => {
-    // Simulate API call
-    const newUser = {
-      id: 'U123',
-      name: 'John Doe',
-      email,
-      phone: '+1-555-0100',
-      emergencyContact: 'Jane Doe',
-      emergencyPhone: '+1-555-0101'
-    };
+  // ============================================================================
+  // AUTHENTICATION FUNCTIONS
+  // ============================================================================
 
+  /**
+   * Register a new user account
+   * TODO: This calls the API service which will connect to backend when ready
+   */
+  const register = async (data: RegisterRequest) => {
     try {
+      const response = await AuthAPI.register(data);
+      
+      // Save auth token
+      await AuthAPI.saveAuthToken(response.token);
+      
+      // Save user data and auth state
       await Promise.all([
         AsyncStorage.setItem('isAuthenticated', 'true'),
-        AsyncStorage.setItem('user', JSON.stringify(newUser))
+        AsyncStorage.setItem('user', JSON.stringify(response.user))
       ]);
 
-      setUser(newUser);
+      setUser(response.user);
       setIsAuthenticated(true);
+      
+      // Check KYC status and navigate accordingly
+      const kycResponse = await AuthAPI.getKYCStatus();
+      let shouldGoToDashboard = false;
+      
+      if (kycResponse.kycApplication && kycResponse.kycApplication.status === 'APPROVED') {
+        setKycStatus('APPROVED');
+        setHasCompletedKYC(true);
+        await AsyncStorage.setItem('hasCompletedKYC', 'true');
+        shouldGoToDashboard = true;
+      } else {
+        setKycStatus('PENDING');
+        setHasCompletedKYC(false);
+        await AsyncStorage.setItem('hasCompletedKYC', 'false');
+      }
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Success!',
+        text2: 'Account created successfully',
+      });
+
+      // Navigate based on KYC status
+      setTimeout(() => {
+        if (shouldGoToDashboard) {
+          router.replace('/(tabs)/dashboard');
+        } else {
+          router.replace('/kyc');
+        }
+      }, 1000);
+
+      return response;
     } catch (error) {
-      console.log('Error saving auth state:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Registration Failed',
+        text2: apiError.message,
+      });
       throw error;
     }
   };
 
+  /**
+   * Login with email and password
+   * TODO: This calls the API service which will connect to backend when ready
+   */
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await AuthAPI.login({ email, password });
+      
+      // Save auth token
+      await AuthAPI.saveAuthToken(response.token);
+      
+      // Save user data and auth state
+      await Promise.all([
+        AsyncStorage.setItem('isAuthenticated', 'true'),
+        AsyncStorage.setItem('user', JSON.stringify(response.user))
+      ]);
+
+      setUser(response.user);
+      setIsAuthenticated(true);
+
+      // Check KYC status and navigate accordingly
+      const kycResponse = await AuthAPI.getKYCStatus();
+      let shouldGoToDashboard = false;
+      
+      if (kycResponse.kycApplication && kycResponse.kycApplication.status === 'APPROVED') {
+        setKycStatus('APPROVED');
+        setHasCompletedKYC(true);
+        await AsyncStorage.setItem('hasCompletedKYC', 'true');
+        shouldGoToDashboard = true;
+      } else {
+        const status = kycResponse.kycApplication?.status || 'PENDING';
+        setKycStatus(status as any);
+        setHasCompletedKYC(false);
+        await AsyncStorage.setItem('hasCompletedKYC', 'false');
+      }
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome back!',
+        text2: 'Logged in successfully',
+      });
+
+      // Navigate based on KYC status
+      setTimeout(() => {
+        if (shouldGoToDashboard) {
+          router.replace('/(tabs)/dashboard');
+        } else {
+          router.replace('/kyc');
+        }
+      }, 1000);
+
+      return response;
+    } catch (error) {
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Login Failed',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  };
+
+  /**
+   * Submit KYC application
+   * TODO: This calls the API service which will connect to backend when ready
+   */
+  const submitKYC = async (data: KYCSubmitRequest) => {
+    try {
+      const response = await AuthAPI.submitKYC(data);
+      
+      setKycStatus('SUBMITTED');
+      await AsyncStorage.setItem('kycApplicationStatus', 'SUBMITTED');
+      
+      Toast.show({
+        type: 'success',
+        text1: 'KYC Submitted',
+        text2: 'Your application is under review',
+      });
+
+      return response;
+    } catch (error) {
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'KYC Submission Failed',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  };
+
+  /**
+   * Complete KYC process (for backward compatibility)
+   */
+  const completeKYC = async () => {
+    try {
+      await AsyncStorage.setItem('hasCompletedKYC', 'true');
+      setHasCompletedKYC(true);
+      setKycStatus('APPROVED');
+    } catch (error) {
+      console.log('Error saving KYC status:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to save KYC status',
+      });
+    }
+  };
+
+  /**
+   * Logout user and clear all auth data
+   */
   const logout = async () => {
     try {
       await Promise.all([
+        AuthAPI.removeAuthToken(),
         AsyncStorage.removeItem('isAuthenticated'),
         AsyncStorage.removeItem('user'),
-        AsyncStorage.removeItem('hasCompletedOnboarding'),
-        AsyncStorage.removeItem('hasCompletedKYC')
+        AsyncStorage.removeItem('hasCompletedKYC'),
+        AsyncStorage.removeItem('kycApplicationStatus')
       ]);
 
       setUser(null);
       setIsAuthenticated(false);
-      setHasCompletedOnboarding(false);
       setHasCompletedKYC(false);
+      setKycStatus('PENDING');
+      
+      Toast.show({
+        type: 'info',
+        text1: 'Logged out',
+        text2: 'See you next time!',
+      });
     } catch (error) {
       console.log('Error clearing auth state:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to logout properly',
+      });
     }
   };
 
   return {
+    // Onboarding
     hasCompletedOnboarding,
-    hasCompletedKYC,
-    isLoading,
     completeOnboarding,
+    
+    // Authentication 
+    isAuthenticated,
+    user,
+    login,
+    register,
+    logout,
+    
+    // KYC
+    hasCompletedKYC,
+    kycStatus,
     completeKYC,
+    submitKYC,
+    checkKYCStatus,
+    
+    // App State
+    isLoading,
+    
+    // App Features (existing)
     touristProfile,
     safetyScore,
     itinerary,
     communityReports,
+    tripStatistics,
     currentLocation,
     isInDangerZone,
     updateLocation,
     language,
     toggleLanguage,
-    isAuthenticated,
-    user,
-    login,
-    logout
   };
 });
