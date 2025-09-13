@@ -280,17 +280,23 @@ router.get('/my-alerts', authenticateToken, async (req: AuthRequest, res: Respon
 });
 
 // Device status endpoint (NO authentication required)
-router.get('/status', async (req: Request, res: Response) => {
+router.get('/status/:id', async (req: Request, res: Response) => {
   try {
-    const { deviceId } = req.query;
-    
-    if (deviceId === 'esp32-01') {
-      res.status(200).json({ status: 'acknowledged' });
-    } else {
-      res.status(400).json({ message: 'Invalid device ID' });
+    const { id } = req.params;
+
+    // Find the SOS request
+    const existingSos = await prisma.sosRequest.findUnique({
+      where: { id },
+      select: { status: true }
+    });
+
+    if (!existingSos) {
+      return res.status(404).json({ message: 'SOS request not found' });
     }
+
+    res.json({ status: existingSos.status });
   } catch (error) {
-    console.error('Device status error:', error);
+    console.error('Get SOS status error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

@@ -26,7 +26,8 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'http://localhost:8081',
-    /^http:\/\/localhost:\d+$/
+    /^http:\/\/localhost:\d+$/,
+    "exp://172.16.11.51:8081"
   ],
   credentials: true
 }));
