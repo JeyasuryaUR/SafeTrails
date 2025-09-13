@@ -279,6 +279,22 @@ router.get('/my-alerts', authenticateToken, async (req: AuthRequest, res: Respon
   }
 });
 
+// Device status endpoint (NO authentication required)
+router.get('/status', async (req: Request, res: Response) => {
+  try {
+    const { deviceId } = req.query;
+    
+    if (deviceId === 'esp32-01') {
+      res.status(200).json({ status: 'acknowledged' });
+    } else {
+      res.status(400).json({ message: 'Invalid device ID' });
+    }
+  } catch (error) {
+    console.error('Device status error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Get SOS request by ID
 router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
