@@ -82,6 +82,7 @@ export default function AuthScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+
     setIsLoading(true);
     
     try {
@@ -91,34 +92,34 @@ export default function AuthScreen() {
       if (isLogin) {
         // Handle login
         await login(formData.email, formData.password);
-        Alert.alert(
-          'Success',
-          'Login successful!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(tabs)/dashboard');
-              }
-            }
-          ]
-        );
+        // Alert.alert(
+        //   'Success',
+        //   'Login successful!',
+        //   [
+        //     {
+        //       text: 'OK',
+        //       onPress: () => {
+                router.replace('/kyc');
+        //       }
+        //     }
+        //   ]
+        // );
       } else {
         // Handle signup - first login the user, then complete onboarding
         await login(formData.email, formData.password);
         await completeOnboarding();
-        Alert.alert(
-          'Success',
-          'Account created successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(tabs)/dashboard');
-              }
-            }
-          ]
-        );
+        // Alert.alert(
+        //   'Success',
+        //   'Account created successfully!',
+        //   [
+        //     {
+        //       text: 'OK',
+        //       onPress: () => {
+                router.replace('/kyc');
+        //       }
+        //     }
+        //   ]
+        // );
       }
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');

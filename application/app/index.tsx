@@ -7,15 +7,15 @@ export default function IndexScreen() {
   const { hasCompletedOnboarding, hasCompletedKYC, isAuthenticated, isLoading } = useSafeTrails();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated) {
+    if (!isLoading) { 
+      if (!hasCompletedOnboarding) {
+        router.replace('/onboarding');
+      } else if (!isAuthenticated) {
         router.replace('/auth');
       } else if (!hasCompletedKYC) {
         router.replace('/kyc');
-      } else if (hasCompletedOnboarding) {
-        router.replace('/(tabs)/dashboard');
       } else {
-        router.replace('/onboarding');
+        router.replace('/(tabs)/dashboard');
       }
     }
   }, [hasCompletedOnboarding, hasCompletedKYC, isAuthenticated, isLoading]);

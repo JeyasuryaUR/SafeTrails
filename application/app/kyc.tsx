@@ -70,7 +70,7 @@ export default function KYCScreen() {
 
   const validateForm = () => {
     const aadharDigits = formData.aadharNumber.replace(/\s/g, '');
-    
+
     if (!aadharDigits || aadharDigits.length !== 12) {
       Alert.alert('Error', 'Please enter a valid 12-digit Aadhar number');
       return false;
@@ -84,7 +84,7 @@ export default function KYCScreen() {
     // Validate date format
     const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
     const match = formData.dateOfBirth.match(dateRegex);
-    
+
     if (!match) {
       Alert.alert('Error', 'Please enter date in DD/MM/YYYY format');
       return false;
@@ -93,7 +93,7 @@ export default function KYCScreen() {
     const [, day, month, year] = match;
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     const now = new Date();
-    
+
     if (date > now) {
       Alert.alert('Error', 'Date of birth cannot be in the future');
       return false;
@@ -112,29 +112,29 @@ export default function KYCScreen() {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    
+
     try {
       // Simulate API call for KYC verification
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Store KYC data
       await completeKYC({
         aadharNumber: formData.aadharNumber.replace(/\s/g, ''),
         dateOfBirth: formData.dateOfBirth
       });
-      
-      Alert.alert(
-        'KYC Verification Successful',
-        'Your identity has been verified successfully. Welcome to SafeTrails!',
-        [
-          {
-            text: 'Continue',
-            onPress: () => {
-              router.replace('/onboarding');
-            }
-          }
-        ]
-      );
+
+      // Alert.alert(
+      //   'KYC Verification Successful',
+      //   'Your identity has been verified successfully. Welcome to SafeTrails!',
+      //   [
+      //     {
+      //       text: 'Continue',
+      //       onPress: () => {
+              router.replace('/(tabs)/dashboard');
+      //       }
+      //     }
+      //   ]
+      // );
     } catch {
       Alert.alert('Error', 'KYC verification failed. Please try again.');
     } finally {
@@ -143,8 +143,8 @@ export default function KYCScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
@@ -177,18 +177,18 @@ export default function KYCScreen() {
                 </View>
                 <Text style={[styles.stepText, styles.completedStepText]}>Account</Text>
               </View>
-              
+
               <View style={styles.stepLine} />
-              
+
               <View style={styles.stepItem}>
                 <View style={[styles.stepCircle, styles.activeStep]}>
                   <Text style={styles.stepNumber}>2</Text>
                 </View>
                 <Text style={[styles.stepText, styles.activeStepText]}>KYC</Text>
               </View>
-              
+
               <View style={styles.stepLine} />
-              
+
               <View style={styles.stepItem}>
                 <View style={styles.stepCircle}>
                   <Text style={styles.stepNumber}>3</Text>
@@ -432,7 +432,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: '#1F2937',
-    outlineStyle: 'none',
   },
   securityNotice: {
     flexDirection: 'row',
