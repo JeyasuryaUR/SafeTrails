@@ -21,10 +21,7 @@ import {
   Navigation,
   Play,
   BarChart3,
-  Timer,
-  Star,
-  Award,
-  StopCircle
+  Timer
 } from 'lucide-react-native';
 import { useSafeTrails } from '@/contexts/SafeTrailsContext';
 import { router } from 'expo-router';
@@ -43,15 +40,15 @@ export default function DashboardScreen() {
     checkActiveTrip,
     trips,
     loadTrips,
-    startTrip,
-    endTrip,
-    activeTrip
+    startTrip
   } = useSafeTrails();
 
   const [animatedScore] = useState(new Animated.Value(safetyScore.overall));
   
   // Determine if user is currently on a trip
   const isOnActiveTrip = hasActiveTrip;
+  console.log('Current user status:', user);
+  console.log('Has active trip:', hasActiveTrip);
 
   useEffect(() => {
     // Load user profile and check for active trips
@@ -59,7 +56,7 @@ export default function DashboardScreen() {
       try {
         await loadUserProfile();
         await checkActiveTrip();
-        await loadTrips('PLANNED'); // Load planned trips for display
+        await loadTrips({ status: 'PLANNED' }); // Load planned trips for display
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       }
@@ -90,62 +87,16 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleEndTrip = async () => {
-    if (!activeTrip) return;
-    
-    Alert.alert(
-      '🏁 End Trip',
-      'Are you sure you want to end your current trip? This will mark your journey as complete.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'End Trip', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await endTrip(activeTrip.id);
-            } catch (error) {
-              console.error('Error ending trip:', error);
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const handleManageTrip = () => {
     Alert.alert(
       '📍 Manage Active Trip',
       'Your current trip: ' + (tripStatistics.activeTripTitle || 'Unknown Trip'),
       [
         { text: 'View Details', onPress: () => console.log('View trip details') },
-        { text: 'End Trip', onPress: handleEndTrip },
+        { text: 'End Trip', style: 'destructive' },
         { text: 'Cancel', style: 'cancel' }
       ]
     );
-  };
-
-  // Calculate overall safety score from the three metrics
-  const calculateOverallSafetyScore = () => {
-    const total = safetyScore.routeRisk + safetyScore.itineraryChecks + safetyScore.activeness;
-    return Math.round(total / 3);
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return '#10B981'; // Emerald green
-    if (score >= 80) return '#3B82F6'; // Blue
-    if (score >= 70) return '#F59E0B'; // Amber
-    if (score >= 60) return '#F97316'; // Orange
-    return '#EF4444'; // Red
-  };
-
-  const getScoreBadge = (score: number) => {
-    if (score >= 95) return '🏆 Legendary';
-    if (score >= 90) return '💎 Excellent';
-    if (score >= 80) return '⭐ Great';
-    if (score >= 70) return '🎯 Good';
-    if (score >= 60) return '⚡ Fair';
-    return '⚠️ Needs Attention';
   };
 
   // Helper functions
@@ -285,127 +236,80 @@ export default function DashboardScreen() {
     </>
   );
 
-  const renderActiveTripDashboard = () => {
-    const overallScore = calculateOverallSafetyScore();
-    const scoreColor = getScoreColor(overallScore);
-    const scoreBadge = getScoreBadge(overallScore);
+  const renderActiveTripDashboard = () => (
+    <>
+      {/* Active Trip Header */}
+      <View style={styles.activeTripHeader}>
+        <Text style={styles.activeTripTitle}>🚀 Trip in Progress</Text>
+        <Text style={styles.activeTripName}>{tripStatistics.activeTripTitle}</Text>
+      </View>
 
-    return (
-      <>
-        {/* Active Trip Header */}
-        <View style={styles.activeTripHeader}>
-          <Text style={styles.activeTripTitle}>🚀 Trip in Progress</Text>
-          <Text style={styles.activeTripName}>{tripStatistics.activeTripTitle}</Text>
-        </View>
-
-        {/* Overall Safety Score - Stunning Display */}
-        <View style={styles.overallScoreCard}>
-          <LinearGradient
-            colors={[scoreColor + '20', scoreColor + '10']}
-            style={styles.scoreGradient}
-          >
-            <View style={styles.scoreHeader}>
-              <Award color={scoreColor} size={28} />
-              <Text style={styles.scoreTitle}>Safety Score</Text>
-            </View>
-            
-            <View style={styles.scoreDisplay}>
-              <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
-                <Text style={[styles.scoreNumber, { color: scoreColor }]}>{overallScore}</Text>
-                <Text style={styles.scoreOutOf}>/ 100</Text>
-              </View>
-              
-              <View style={styles.scoreBadgeContainer}>
-                <Text style={[styles.scoreBadge, { color: scoreColor }]}>{scoreBadge}</Text>
-                <Text style={styles.scoreDescription}>
-                  Your journey is {overallScore >= 80 ? 'very safe' : overallScore >= 60 ? 'relatively safe' : 'needs attention'}
-                </Text>
-              </View>
-            </View>
-
-          </LinearGradient>
-        </View>
-
-        {/* Individual Trip Metrics */}
-        <Text style={[styles.sectionTitle, { marginBottom: 12, marginTop: 8 }]}>Detailed Metrics</Text>
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#10B981' }]}>
-              <MapPin color="white" size={20} />
-            </View>
-            <Text style={styles.metricValue}>{safetyScore.routeRisk}</Text>
-            <Text style={styles.metricLabel}>Route Safety</Text>
+      {/* Trip Metrics */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIcon, { backgroundColor: '#10B981' }]}>
+            <MapPin color="white" size={20} />
           </View>
+          <Text style={styles.metricValue}>{safetyScore.routeRisk}</Text>
+          <Text style={styles.metricLabel}>Route Safety</Text>
+        </View>
 
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#3B82F6' }]}>
-              <CheckCircle color="white" size={20} />
-            </View>
-            <Text style={styles.metricValue}>{safetyScore.itineraryChecks}</Text>
-            <Text style={styles.metricLabel}>Itinerary Checks</Text>
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIcon, { backgroundColor: '#3B82F6' }]}>
+            <CheckCircle color="white" size={20} />
           </View>
+          <Text style={styles.metricValue}>{safetyScore.itineraryChecks}</Text>
+          <Text style={styles.metricLabel}>Itinerary Checks</Text>
+        </View>
 
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#F59E0B' }]}>
-              <TrendingUp color="white" size={20} />
-            </View>
-            <Text style={styles.metricValue}>{safetyScore.activeness}</Text>
-            <Text style={styles.metricLabel}>Activity Level</Text>
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIcon, { backgroundColor: '#F59E0B' }]}>
+            <TrendingUp color="white" size={20} />
           </View>
+          <Text style={styles.metricValue}>{safetyScore.activeness}</Text>
+          <Text style={styles.metricLabel}>Activity Level</Text>
         </View>
+      </View>
 
-        {/* Trip Actions */}
-        <View style={styles.activeTripSection}>
-          <Text style={styles.sectionTitle}>Trip Actions</Text>
-          
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/map')}
-          >
-            <MapPin color="#10B981" size={24} />
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>View Live Location</Text>
-              <Text style={styles.actionSubtitle}>Track your current position & route</Text>
-            </View>
-          </TouchableOpacity>
+      {/* Trip Actions */}
+      <View style={styles.activeTripSection}>
+        <Text style={styles.sectionTitle}>Trip Actions</Text>
+        
+        <TouchableOpacity 
+          style={styles.actionCard}
+          onPress={() => router.push('/(tabs)/map')}
+        >
+          <MapPin color="#10B981" size={24} />
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>View Live Location</Text>
+            <Text style={styles.actionSubtitle}>Track your current position & route</Text>
+          </View>
+        </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={handleManageTrip}
-          >
-            <Activity color="#3B82F6" size={24} />
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Manage Trip</Text>
-              <Text style={styles.actionSubtitle}>View details & trip controls</Text>
-            </View>
-          </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionCard}
+          onPress={handleManageTrip}
+        >
+          <Activity color="#3B82F6" size={24} />
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Manage Trip</Text>
+            <Text style={styles.actionSubtitle}>View details & trip controls</Text>
+          </View>
+        </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionCard, styles.emergencyCard]}
-            onPress={() => router.push('/sos')}
-          >
-            <AlertTriangle color="#EF4444" size={24} />
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Emergency SOS</Text>
-              <Text style={styles.actionSubtitle}>Immediate help & alert contacts</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* End Trip Button */}
-        <View style={styles.endTripSection}>
-          <TouchableOpacity 
-            style={styles.endTripButton}
-            onPress={handleEndTrip}
-          >
-            <StopCircle color="white" size={24} />
-            <Text style={styles.endTripButtonText}>End Trip</Text>
-          </TouchableOpacity>
-          <Text style={styles.endTripSubtext}>Complete your journey and mark it as finished</Text>
-        </View>
-      </>
-    );
-  };
+        <TouchableOpacity 
+          style={[styles.actionCard, styles.emergencyCard]}
+          onPress={() => router.push('/sos')}
+        >
+          <AlertTriangle color="#EF4444" size={24} />
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Emergency SOS</Text>
+            <Text style={styles.actionSubtitle}>Immediate help & alert contacts</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
 
   const renderDashboardContent = () => {
     if (isOnActiveTrip) {
@@ -419,8 +323,20 @@ export default function DashboardScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <LinearGradient
         colors={['#2563EB', '#3B82F6']}
-        // style={styles.header}
+        style={styles.header}
       >
+        <View style={styles.headerContent}>
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeText}>
+              {language === 'en' ? 'Welcome back,' : 'वापसी पर स्वागत है,'}
+            </Text>
+            <Text style={styles.userName}>{touristProfile.name}</Text>
+          </View>
+          <TouchableOpacity onPress={toggleLanguage} style={styles.languageToggle}>
+            <Globe color="white" size={20} />
+            <Text style={styles.languageText}>{language.toUpperCase()}</Text>
+          </TouchableOpacity>
+        </View>
 
         {isInDangerZone && (
           <View style={styles.alertBanner}>
@@ -458,6 +374,11 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     flex: 1,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 4,
   },
   userName: {
     fontSize: 24,
@@ -790,116 +711,5 @@ const styles = StyleSheet.create({
   actionSubtitle: {
     fontSize: 14,
     color: '#6B7280',
-  },
-  // Overall Safety Score Styles
-  overallScoreCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    margin: 4,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    overflow: 'hidden',
-  },
-  scoreGradient: {
-    padding: 24,
-  },
-  scoreHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  scoreTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginLeft: 12,
-  },
-  scoreDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  scoreCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'white',
-  },
-  scoreNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  scoreOutOf: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  scoreBadgeContainer: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  scoreBadge: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  scoreDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-  scoreStars: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // End Trip Section Styles
-  endTripSection: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  endTripButton: {
-    backgroundColor: '#EF4444',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    minWidth: 200,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  endTripButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  endTripSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });

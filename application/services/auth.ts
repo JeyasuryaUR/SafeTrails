@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================================================
@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ============================================================================
 
 // Environment-based API configuration
-// TODO: Update this URL when backend is deployed
 const getApiBaseUrl = () => {
   // Check if we have an environment variable for API URL
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -17,13 +16,11 @@ const getApiBaseUrl = () => {
   }
   
   // Default to localhost for development
-  // This will use mock data since the backend isn't running
-  console.log('No API URL found in environment, using mock data mode');
+  console.log('Using default localhost API URL');
   return 'http://localhost:3000';
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const USE_MOCK_DATA = !process.env.EXPO_PUBLIC_API_URL;
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -145,6 +142,54 @@ export interface UpdateEmergencyContactsRequest {
   contacts: EmergencyContact[];
 }
 
+export interface ItineraryItem {
+  id?: string;
+  location: string;
+  landmark: string;
+  latitude: number;
+  longitude: number;
+  plannedTime: string;
+  order?: number;
+  isCompleted?: boolean;
+}
+
+export interface Trip {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  startLocation: string;
+  endLocation: string;
+  status: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  safetyScore?: number;
+  createdAt: string;
+  itineraryItems?: ItineraryItem[];
+  _count?: {
+    communityPosts: number;
+    sosRequests: number;
+    locationUpdates: number;
+  };
+}
+
+export interface CreateTripRequest {
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  startLocation: string;
+  endLocation: string;
+  startLatitude: number;
+  startLongitude: number;
+  endLatitude: number;
+  endLongitude: number;
+  itineraryItems?: Omit<ItineraryItem, 'id' | 'order' | 'isCompleted'>[];
+}
+
+export interface TripsResponse {
+  trips: Trip[];
+}
+
 export interface ApiError {
   message: string;
   error?: string;
@@ -204,31 +249,11 @@ export class AuthAPI {
   
   /**
    * Register a new user account
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async register(data: RegisterRequest): Promise<AuthResponse> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<AuthResponse> = await apiClient.post('/api/auth/register', data);
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
-      
-      const mockResponse: AuthResponse = {
-        message: 'User created successfully',
-        user: {
-          id: `user_${Date.now()}`,
-          email: data.email,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          createdAt: new Date().toISOString(),
-        },
-        token: `mock_token_${Date.now()}`
-      };
-      
-      return mockResponse;
+      const response: AxiosResponse<AuthResponse> = await apiClient.post('/api/auth/register', data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -236,32 +261,11 @@ export class AuthAPI {
 
   /**
    * Login with email and password
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async login(data: LoginRequest): Promise<AuthResponse> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<AuthResponse> = await apiClient.post('/api/auth/login', data);
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
-      
-      const mockResponse: AuthResponse = {
-        message: 'Login successful',
-        user: {
-          id: 'user_12345',
-          email: data.email,
-          firstName: 'John',
-          lastName: 'Doe',
-          phone: '+1234567890',
-          createdAt: '2025-01-13T10:30:00.000Z',
-          isActive: true,
-        },
-        token: `mock_token_${Date.now()}`
-      };
-      
-      return mockResponse;
+      const response: AxiosResponse<AuthResponse> = await apiClient.post('/api/auth/login', data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -269,31 +273,11 @@ export class AuthAPI {
 
   /**
    * Get current user profile
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async getProfile(): Promise<UserProfile> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<UserProfile> = await apiClient.get('/api/auth/profile');
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
-      
-      const mockResponse: UserProfile = {
-        user: {
-          id: 'user_12345',
-          email: 'john.doe@example.com',
-          firstName: 'John',
-          lastName: 'Doe',
-          phone: '+1234567890',
-          isActive: true,
-          createdAt: '2025-01-13T10:30:00.000Z',
-          updatedAt: '2025-01-13T10:30:00.000Z',
-        }
-      };
-      
-      return mockResponse;
+      const response: AxiosResponse<UserProfile> = await apiClient.get('/api/auth/profile');
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -301,30 +285,11 @@ export class AuthAPI {
 
   /**
    * Update user profile
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async updateProfile(data: UpdateProfileRequest): Promise<UpdateProfileResponse> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<UpdateProfileResponse> = await apiClient.put('/api/auth/profile', data);
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 1200)); // Simulate network delay
-      
-      const mockResponse: UpdateProfileResponse = {
-        message: 'Profile updated successfully',
-        user: {
-          id: 'user_12345',
-          email: 'john.doe@example.com',
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          updatedAt: new Date().toISOString(),
-        }
-      };
-      
-      return mockResponse;
+      const response: AxiosResponse<UpdateProfileResponse> = await apiClient.put('/api/auth/profile', data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -332,18 +297,11 @@ export class AuthAPI {
 
   /**
    * Change user password
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async changePassword(data: ChangePasswordRequest): Promise<{ message: string }> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<{ message: string }> = await apiClient.put('/api/auth/change-password', data);
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-      
-      return { message: 'Password changed successfully' };
+      const response: AxiosResponse<{ message: string }> = await apiClient.put('/api/auth/change-password', data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -351,27 +309,11 @@ export class AuthAPI {
 
   /**
    * Submit KYC application
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async submitKYC(data: KYCSubmitRequest): Promise<KYCSubmitResponse> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<KYCSubmitResponse> = await apiClient.post('/api/auth/kyc/submit', data);
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
-      
-      const mockResponse: KYCSubmitResponse = {
-        message: 'KYC application submitted successfully',
-        application: {
-          id: `kyc_${Date.now()}`,
-          status: 'SUBMITTED',
-          createdAt: new Date().toISOString(),
-        }
-      };
-      
-      return mockResponse;
+      const response: AxiosResponse<KYCSubmitResponse> = await apiClient.post('/api/auth/kyc/submit', data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -379,49 +321,13 @@ export class AuthAPI {
 
   /**
    * Get KYC application status
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async getKYCStatus(): Promise<KYCStatusResponse> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<KYCStatusResponse> = await apiClient.get('/api/auth/kyc/status');
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
-      
-      // Simulate different KYC states based on local storage for demo
-      const kycStatus = await AsyncStorage.getItem('mockKYCStatus') || 'PENDING';
-      
-      let mockResponse: KYCStatusResponse;
-      
-      if (kycStatus === 'APPROVED') {
-        mockResponse = {
-          kycApplication: {
-            id: 'kyc_12345',
-            status: 'APPROVED',
-            adminComments: 'Documents verified successfully',
-            verifiedAt: '2025-01-13T12:00:00.000Z',
-            createdAt: '2025-01-13T10:30:00.000Z',
-            updatedAt: '2025-01-13T12:00:00.000Z',
-          }
-        };
-      } else if (kycStatus === 'SUBMITTED') {
-        mockResponse = {
-          kycApplication: {
-            id: 'kyc_12345',
-            status: 'SUBMITTED',
-            createdAt: '2025-01-13T10:30:00.000Z',
-            updatedAt: '2025-01-13T10:30:00.000Z',
-          }
-        };
-      } else {
-        mockResponse = {
-          kycApplication: null
-        };
-      }
-      
-      return mockResponse;
+      console.log('Fetching KYC status from backend...');
+      const response: AxiosResponse<KYCStatusResponse> = await apiClient.get('/api/auth/kyc/status');
+      console.log('KYC Status response:', response.data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -429,18 +335,11 @@ export class AuthAPI {
 
   /**
    * Update emergency contacts
-   * TODO: Replace with actual backend endpoint when ready
    */
   static async updateEmergencyContacts(data: UpdateEmergencyContactsRequest): Promise<{ message: string }> {
     try {
-      // TODO: Uncomment when backend is ready
-      // const response: AxiosResponse<{ message: string }> = await apiClient.put('/api/auth/emergency-contacts', data);
-      // return response.data;
-
-      // MOCK IMPLEMENTATION - Remove when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-      
-      return { message: 'Emergency contacts updated successfully' };
+      const response: AxiosResponse<{ message: string }> = await apiClient.put('/api/auth/emergency-contacts', data);
+      return response.data;
     } catch (error) {
       throw AuthAPI.handleApiError(error);
     }
@@ -453,7 +352,7 @@ export class AuthAPI {
   /**
    * Handle API errors and convert to user-friendly messages
    */
-  private static handleApiError(error: any): ApiError {
+  static handleApiError(error: any): ApiError {
     if (error.response) {
       // Server responded with error status
       const apiError: ApiError = {
@@ -511,31 +410,87 @@ export class AuthAPI {
       return null;
     }
   }
-}
 
-// ============================================================================
-// MOCK DATA HELPERS (Remove when backend is ready)
-// ============================================================================
+  // ============================================================================
+  // TRIP MANAGEMENT API FUNCTIONS
+  // ============================================================================
 
-export class MockKYCHelper {
   /**
-   * Simulate KYC approval (for testing UI flow)
+   * Get trips with optional filtering
    */
-  static async approveKYC(): Promise<void> {
-    await AsyncStorage.setItem('mockKYCStatus', 'APPROVED');
+  static async getTrips(params?: {
+    status?: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+    limit?: number;
+    offset?: number;
+  }): Promise<TripsResponse> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.status) queryParams.append('status', params.status);
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+      const url = `/api/trips${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response: AxiosResponse<TripsResponse> = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      throw AuthAPI.handleApiError(error);
+    }
   }
 
   /**
-   * Simulate KYC submission (for testing UI flow)
+   * Check if user has any active trips
    */
-  static async submitKYC(): Promise<void> {
-    await AsyncStorage.setItem('mockKYCStatus', 'SUBMITTED');
+  static async hasActiveTrip(): Promise<{ hasActiveTrip: boolean; activeTrip?: Trip }> {
+    try {
+      const response = await this.getTrips({ status: 'ACTIVE', limit: 1 });
+      const hasActiveTrip = response.trips.length > 0;
+      const activeTrip = hasActiveTrip ? response.trips[0] : undefined;
+      
+      return { hasActiveTrip, activeTrip };
+    } catch (error) {
+      throw AuthAPI.handleApiError(error);
+    }
   }
 
   /**
-   * Reset KYC status (for testing UI flow)
+   * Create a new trip
    */
-  static async resetKYC(): Promise<void> {
-    await AsyncStorage.removeItem('mockKYCStatus');
+  static async createTrip(data: CreateTripRequest): Promise<{ message: string; trip: Trip }> {
+    try {
+      const response: AxiosResponse<{ message: string; trip: Trip }> = await apiClient.post('/api/trips', data);
+      return response.data;
+    } catch (error) {
+      throw AuthAPI.handleApiError(error);
+    }
+  }
+
+  /**
+   * Start a trip (change status from PLANNED to ACTIVE)
+   */
+  static async startTrip(tripId: string): Promise<{ message: string; trip: Trip }> {
+    try {
+    const response: AxiosResponse<{ message: string; trip: Trip }> = await apiClient.post(`/api/trips/${tripId}/start`, {
+      startLatitude: 37.7749,  // Mock latitude (San Francisco)
+      startLongitude: -122.4194  // Mock longitude (San Francisco)
+    });
+      return response.data;
+    } catch (error) {
+      throw AuthAPI.handleApiError(error);
+    }
+  }
+
+  /**
+   * End a trip (change status from ACTIVE to COMPLETED)
+   */
+  static async endTrip(tripId: string): Promise<{ message: string; trip: Trip }> {
+    try {
+      const response: AxiosResponse<{ message: string; trip: Trip }> = await apiClient.post(`/api/trips/${tripId}/end`, {
+        endLatitude: 37.7849,  // Mock end latitude 
+        endLongitude: -122.4094  // Mock end longitude
+      });
+      return response.data;
+    } catch (error) {
+      throw AuthAPI.handleApiError(error);
+    }
   }
 }

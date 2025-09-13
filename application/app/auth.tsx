@@ -139,6 +139,8 @@ export default function AuthScreen() {
         lastName,
         phone,
       });
+
+      console.log('Registration successful');
       
       Toast.show({
         type: 'success',
@@ -171,12 +173,6 @@ export default function AuthScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>SafeTrails</Text>
-            <Text style={styles.subtitle}>
-              {isLogin ? 'Welcome Back!' : 'Join SafeTrails'}
-            </Text>
-          </View>
 
           <View style={styles.formContainer}>
             <View style={styles.toggleContainer}>

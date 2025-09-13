@@ -1,6 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
 import { 
   AuthAPI, 
@@ -9,7 +9,10 @@ import {
   KYCSubmitRequest,
   ApiError,
   UserProfile,
-  KYCStatusResponse
+  KYCStatusResponse,
+  Trip,
+  CreateTripRequest,
+  TripsResponse
 } from '@/services/auth';
 import Toast from 'react-native-toast-message';
 
@@ -270,6 +273,11 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     totalTimeSpent: 48.5,
   });
 
+  // Trip Management State
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
+  const [hasActiveTrip, setHasActiveTrip] = useState<boolean>(false);
+
   useEffect(() => {
     loadAppState();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -454,12 +462,39 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
   };
 
   /**
+   * Load user profile from API
+   */
+  const loadUserProfile = useCallback(async () => {
+    try {
+      const profileResponse = await AuthAPI.getProfile();
+      // console.log('Profile response:', profileResponse);
+      
+      setUser(profileResponse.user);
+
+      // Save updated user data
+      await AsyncStorage.setItem('user', JSON.stringify(profileResponse.user));
+      
+      return profileResponse.user;
+    } catch (error) {
+      console.log('Error loading user profile:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Profile Loading Failed',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  }, []);
+
+  /**
    * Login with email and password
    * TODO: This calls the API service which will connect to backend when ready
    */
   const login = async (email: string, password: string) => {
     try {
       const response = await AuthAPI.login({ email, password });
+      console.log('Login response:', response);
       
       // Save auth token
       await AuthAPI.saveAuthToken(response.token);
@@ -472,6 +507,9 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
 
       setUser(response.user);
       setIsAuthenticated(true);
+
+      // Load full user profile to get isActive status
+      await loadUserProfile();
 
       // Check KYC status and navigate accordingly
       const kycResponse = await AuthAPI.getKYCStatus();
@@ -596,6 +634,153 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     }
   };
 
+  // ============================================================================
+  // TRIP MANAGEMENT FUNCTIONS
+  // ============================================================================
+
+  /**
+   * Load user's trips
+   */
+  const loadTrips = useCallback(async (status?: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED') => {
+    try {
+      const response = await AuthAPI.getTrips(status ? { status } : {});
+      setTrips(response.trips);
+      return response.trips;
+    } catch (error) {
+      console.log('Error loading trips:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Load Trips',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Check if user has any active trips
+   */
+  const checkActiveTrip = useCallback(async () => {
+    try {
+      const result = await AuthAPI.hasActiveTrip();
+      setHasActiveTrip(result.hasActiveTrip);
+      setActiveTrip(result.activeTrip || null);
+      
+      // Update trip statistics
+      setTripStatistics(prev => ({
+        ...prev,
+        activeTripId: result.activeTrip?.id,
+        activeTripTitle: result.activeTrip?.title,
+        activeTripStartDate: result.activeTrip?.startDate,
+      }));
+
+      return result;
+    } catch (error) {
+      console.log('Error checking active trip:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Check Active Trip',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Create a new trip
+   */
+  const createTrip = useCallback(async (tripData: CreateTripRequest) => {
+    try {
+      const response = await AuthAPI.createTrip(tripData);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Trip Created!',
+        text2: response.message,
+      });
+
+      // Refresh trips list
+      await loadTrips();
+      
+      return response.trip;
+    } catch (error) {
+      console.log('Error creating trip:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Create Trip',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  }, [loadTrips]);
+
+  /**
+   * Start a trip (change status from PLANNED to ACTIVE)
+   */
+  const startTrip = useCallback(async (tripId: string) => {
+    try {
+      const response = await AuthAPI.startTrip(tripId);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Trip Started!',
+        text2: response.message,
+      });
+
+      // Refresh trips and active trip status
+      await Promise.all([
+        loadTrips(),
+        checkActiveTrip()
+      ]);
+      
+      return response.trip;
+    } catch (error) {
+      console.log('Error starting trip:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Start Trip',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  }, [loadTrips, checkActiveTrip]);
+
+  /**
+   * End a trip (change status from ACTIVE to COMPLETED)
+   */
+  const endTrip = useCallback(async (tripId: string) => {
+    try {
+      const response = await AuthAPI.endTrip(tripId);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Trip Completed! 🎉',
+        text2: response.message,
+      });
+
+      // Refresh trips and active trip status
+      await Promise.all([
+        loadTrips(),
+        checkActiveTrip()
+      ]);
+      
+      return response.trip;
+    } catch (error) {
+      console.log('Error ending trip:', error);
+      const apiError = error as ApiError;
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to End Trip',
+        text2: apiError.message,
+      });
+      throw error;
+    }
+  }, [loadTrips, checkActiveTrip]);
+
   return {
     // Onboarding
     hasCompletedOnboarding,
@@ -607,6 +792,7 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     login,
     register,
     logout,
+    loadUserProfile,
     
     // KYC
     hasCompletedKYC,
@@ -617,6 +803,16 @@ export const [SafeTrailsProvider, useSafeTrails] = createContextHook(() => {
     
     // App State
     isLoading,
+    
+    // Trip Management
+    trips,
+    activeTrip,
+    hasActiveTrip,
+    loadTrips,
+    checkActiveTrip,
+    createTrip,
+    startTrip,
+    endTrip,
     
     // App Features (existing)
     touristProfile,
