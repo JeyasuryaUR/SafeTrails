@@ -218,4 +218,135 @@ router.put('/change-password', authenticateToken, async (req: AuthRequest, res: 
   }
 });
 
+// Submit KYC Application
+router.post('/kyc/submit', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      aadhaarNumber,
+      fullName,
+      dateOfBirth,
+      address,
+      phoneNumber,
+      email,
+      documentType,
+      documentNumber,
+      documentImage,
+      selfieImage
+    } = req.body;
+
+    // Validate required fields
+    if (!aadhaarNumber || !fullName || !dateOfBirth || !address || !phoneNumber || !email || !documentImage || !selfieImage) {
+      return res.status(400).json({ message: 'All KYC fields are required' });
+    }
+
+    // Check if KYC already exists
+    const existingKyc = await prisma.kycApplication.findUnique({
+      where: { userId: req.user!.id }
+    });
+
+    if (existingKyc) {
+      return res.status(400).json({ message: 'KYC application already submitted' });
+    }
+
+    // Check if Aadhaar number is already used
+    const existingAadhaar = await prisma.kycApplication.findUnique({
+      where: { aadhaarNumber }
+    });
+
+    if (existingAadhaar) {
+      return res.status(400).json({ message: 'Aadhaar number already registered' });
+    }
+
+    // Create KYC application
+    const kycApplication = await prisma.kycApplication.create({
+      data: {
+        userId: req.user!.id,
+        aadhaarNumber,
+        fullName,
+        dateOfBirth: new Date(dateOfBirth),
+        address,
+        phoneNumber,
+        email,
+        documentType: documentType || 'AADHAAR',
+        documentNumber,
+        documentImage,
+        selfieImage,
+        status: 'SUBMITTED'
+      }
+    });
+
+    // Update user KYC status
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { kycStatus: 'SUBMITTED' }
+    });
+
+    res.status(201).json({
+      message: 'KYC application submitted successfully',
+      application: {
+        id: kycApplication.id,
+        status: kycApplication.status,
+        createdAt: kycApplication.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('KYC submission error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get KYC Status
+router.get('/kyc/status', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const kycApplication = await prisma.kycApplication.findUnique({
+      where: { userId: req.user!.id },
+      select: {
+        id: true,
+        status: true,
+        adminComments: true,
+        verifiedAt: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!kycApplication) {
+      return res.status(404).json({ message: 'No KYC application found' });
+    }
+
+    res.json({ kycApplication });
+  } catch (error) {
+    console.error('KYC status error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Update Emergency Contacts
+router.put('/emergency-contacts', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { emergencyContacts } = req.body;
+
+    if (!Array.isArray(emergencyContacts)) {
+      return res.status(400).json({ message: 'Emergency contacts must be an array' });
+    }
+
+    // Validate emergency contacts format
+    for (const contact of emergencyContacts) {
+      if (!contact.name || !contact.phone || !contact.relation) {
+        return res.status(400).json({ message: 'Each contact must have name, phone, and relation' });
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { emergencyContacts }
+    });
+
+    res.json({ message: 'Emergency contacts updated successfully' });
+  } catch (error) {
+    console.error('Emergency contacts update error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 export default router;
