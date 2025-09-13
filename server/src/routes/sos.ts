@@ -4,7 +4,7 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// Trigger SOS Alert (Panic Button)
+// Trigger SOS Alert (Panic Button) - Authenticated (Bearer token)
 router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const {
@@ -88,6 +88,127 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     // Update user's location
     await prisma.user.update({
       where: { id: req.user!.id },
+      data: {
+        currentLatitude: parseFloat(latitude),
+        currentLongitude: parseFloat(longitude),
+        lastLocationUpdate: new Date()
+      }
+    });
+
+    // TODO: Here you would typically:
+    // 1. Send SMS/calls to emergency contacts
+    // 2. Notify local authorities if needed
+    // 3. Send push notifications to admin dashboard
+    // 4. Trigger automated response systems
+
+    res.status(201).json({
+      message: 'SOS alert triggered successfully',
+      sosRequest: {
+        id: sosRequest.id,
+        status: sosRequest.status,
+        location: sosRequest.location,
+        sosType: sosRequest.sosType,
+        createdAt: sosRequest.createdAt,
+        contactNumbers: sosRequest.contactNumbers
+      },
+      emergencyInfo: {
+        contactsNotified: user.emergencyContacts ? (user.emergencyContacts as any[]).length : 0,
+        location: location,
+        coordinates: { latitude, longitude },
+        timestamp: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('SOS alert error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Trigger SOS Alert (Panic Button) - Device (NO Bearer token, expects userId in body)
+router.post('/device', async (req: Request, res: Response) => {
+  try {
+    const {
+      userId,
+      location,
+      latitude,
+      longitude,
+      sosType,
+      description,
+      tripId
+    } = req.body;
+
+    // Validate required fields
+    if (!userId || !location || !latitude || !longitude) {
+      return res.status(400).json({ message: 'userId, location and coordinates are required for SOS alert' });
+    }
+
+    // Get user's emergency contacts
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        emergencyContacts: true,
+        firstName: true,
+        lastName: true,
+        phone: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Create SOS request
+    const sosRequest = await prisma.sosRequest.create({
+      data: {
+        userId: userId,
+        // tripId: tripId || null,
+        location,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        sosType: sosType || 'GENERAL',
+        description: description || null,
+        contactNumbers: user.emergencyContacts || [],
+        status: 'NEW'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            emergencyContacts: true
+          }
+        },
+        trip: {
+          select: {
+            id: true,
+            title: true,
+            startLocation: true,
+            endLocation: true
+          }
+        }
+      }
+    });
+
+    // Update trip status to EMERGENCY if there's an active trip
+    if (tripId) {
+      await prisma.trip.updateMany({
+        where: {
+          id: tripId,
+          userId: userId,
+          status: 'ACTIVE'
+        },
+        data: {
+          status: 'EMERGENCY'
+        }
+      });
+    }
+
+    // Update user's location
+    await prisma.user.update({
+      where: { id: userId },
       data: {
         currentLatitude: parseFloat(latitude),
         currentLongitude: parseFloat(longitude),
