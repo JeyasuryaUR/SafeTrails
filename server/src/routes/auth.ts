@@ -338,7 +338,7 @@ router.get('/kyc/status', authenticateToken, async (req: AuthRequest, res: Respo
     });
 
     if (!kycApplication) {
-      return res.status(404).json({ message: 'No KYC application found' });
+      return res.status(201).json({ message: 'No KYC application found',status:false });
     }
 
     res.json({ kycApplication });
