@@ -24,7 +24,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: [
+    'http://localhost:8081',
+    /^http:\/\/localhost:\d+$/
+  ],
   credentials: true
 }));
 app.use(morgan('combined'));
